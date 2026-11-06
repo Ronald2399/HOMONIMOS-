@@ -8,6 +8,7 @@
     "build": "vite build",
     "start": "NODE_ENV=production tsx server/index.ts",
     "preview": "NODE_ENV=production tsx server/index.ts",
+    "migrate:postgres": "tsx scripts/migrate-postgres.ts",
     "check": "tsc --noEmit"
   },
   "dependencies": {
@@ -19,6 +20,7 @@
     "framer-motion": "^12.23.22",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.453.0",
+    "pg": "^8.23.1",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
     "typescript": "5.6.3",
@@ -30,6 +32,7 @@
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "24.7.0",
+    "@types/pg": "^8.23.1",
     "@types/react": "19.2.1",
     "@types/react-dom": "19.2.1",
     "tsx": "^4.23.15"

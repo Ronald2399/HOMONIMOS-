@@ -65,6 +65,11 @@ export class HomonimosApi {
     return this.request<{ user: User | null }>("/api/auth/me");
   }
 
+  async logout() {
+    await this.request<void>("/api/auth/logout", { method: "POST" });
+    this.sessionToken = null;
+  }
+
   async search(name: string) {
     return this.request<{ users: User[] }>(`/api/search?q=${encodeURIComponent(name)}`);
   }

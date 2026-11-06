@@ -5,8 +5,8 @@ A API do Homônimos é compartilhada por web, Android e iOS. O arquivo `src/api.
 ## Fluxo recomendado
 
 1. Criar o cliente com a URL HTTPS da API.
-2. Após `register` ou `login`, armazenar `getSessionToken()` em armazenamento seguro (`expo-secure-store` no Expo; Keychain no iOS e Keystore no Android).
-3. Reidratar o token ao abrir o aplicativo e chamar `me()`.
+2. Após `register` ou `login`, usar `persistApiSession()`; ele armazena o token em `expo-secure-store` (Keychain no iOS e Keystore no Android).
+3. Reidratar o token ao abrir o aplicativo com `createAuthenticatedApi()` e chamar `me()`.
 4. Nunca armazenar CPF, selfie, documento ou processo em AsyncStorage, logs ou analytics.
 5. Usar `report()` e `block()` em toda tela de perfil, post ou conversa.
 
@@ -14,10 +14,11 @@ Exemplo:
 
 ```ts
 import { HomonimosApi } from "./src/api";
+import { createAuthenticatedApi, persistApiSession } from "./src/auth";
 
 const api = new HomonimosApi("https://api.seu-dominio.com");
 const user = await api.login(email, senha);
-// Persista api.getSessionToken() usando armazenamento seguro.
+await persistApiSession(api);
 const results = await api.search("Ronaldo");
 ```
 
