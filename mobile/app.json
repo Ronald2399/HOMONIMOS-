@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "Homônimos",
+    "slug": "homonimos",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "homonimos",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "br.com.homonimos.app"
+    },
+    "android": {
+      "package": "br.com.homonimos.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#102A43"
+      }
+    },
+    "plugins": ["expo-router", "expo-secure-store"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

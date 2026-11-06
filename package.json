@@ -1,0 +1,37 @@
+{
+  "name": "homonimos",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx server/index.ts",
+    "build": "vite build",
+    "start": "NODE_ENV=production tsx server/index.ts",
+    "preview": "NODE_ENV=production tsx server/index.ts",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^5.0.4",
+    "better-sqlite3": "^13.0.3",
+    "cookie-parser": "^1.4.7",
+    "dotenv": "^16.6.1",
+    "express": "^5.3.0",
+    "framer-motion": "^12.23.22",
+    "jsonwebtoken": "^9.0.3",
+    "lucide-react": "^0.453.0",
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1",
+    "typescript": "5.6.3",
+    "vite": "^7.1.7",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "24.7.0",
+    "@types/react": "19.2.1",
+    "@types/react-dom": "19.2.1",
+    "tsx": "^4.23.15"
+  }
+}
