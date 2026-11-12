@@ -1,19 +1,33 @@
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { API_URL, HomonimosApi } from "../src/api";
+import { API_URL, HomonimosApi, type User } from "../src/api";
+import { persistApiSession, signOut } from "../src/auth";
 import { loadSessionToken } from "../src/session";
 
 const api = new HomonimosApi(API_URL);
 
+type AuthMode = "login" | "register";
+
 export default function HomeScreen() {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<Array<{ id: number; name: string; city: string | null; profession: string | null }>>([]);
+  const [results, setResults] = useState<User[]>([]);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
   const [restoringSession, setRestoringSession] = useState(true);
   const [message, setMessage] = useState("Descubra pessoas que compartilham o seu nome.");
+  const [authMode, setAuthMode] = useState<AuthMode>("login");
+  const [authOpen, setAuthOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [city, setCity] = useState("");
+  const [profession, setProfession] = useState("");
 
-  const canSearch = useMemo(() => query.trim().length >= 2 && !loading, [query, loading]);
+  const canSearch = useMemo(() => query.trim().length >= 2 && !loading && !restoringSession, [query, loading, restoringSession]);
+  const canSubmitAuth = authMode === "register"
+    ? name.trim().length >= 2 && email.includes("@") && password.length >= 8 && !loading
+    : email.includes("@") && password.length >= 1 && !loading;
 
   useEffect(() => {
     let mounted = true;
@@ -22,10 +36,11 @@ export default function HomeScreen() {
         const token = await loadSessionToken();
         if (token) {
           api.setSessionToken(token);
-          await api.me();
+          const response = await api.me();
+          if (mounted) setUser(response.user);
         }
       } catch {
-        // A sessão expirada será tratada pelo próximo login, sem bloquear a busca pública.
+        api.setSessionToken(null);
       } finally {
         if (mounted) setRestoringSession(false);
       }
@@ -49,6 +64,39 @@ export default function HomeScreen() {
     }
   }
 
+  async function submitAuth() {
+    if (!canSubmitAuth) return;
+    setLoading(true);
+    setMessage("");
+    try {
+      const authenticatedUser = authMode === "register"
+        ? await api.register({ name: name.trim(), email: email.trim(), password, city: city.trim() || undefined, profession: profession.trim() || undefined })
+        : await api.login(email.trim(), password);
+      await persistApiSession(api);
+      setUser(authenticatedUser);
+      setAuthOpen(false);
+      setPassword("");
+      setMessage(authMode === "register" ? "Conta criada com sucesso." : "Login realizado com sucesso.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Não foi possível concluir o acesso.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleLogout() {
+    setLoading(true);
+    try {
+      await signOut(api);
+      setUser(null);
+      setMessage("Você saiu da sua conta neste aparelho.");
+    } catch {
+      setMessage("A sessão local foi encerrada.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -56,10 +104,36 @@ export default function HomeScreen() {
         <Text style={styles.kicker}>uma rede feita para histórias reais</Text>
         <Text style={styles.title}>O mesmo nome.{"\n"}<Text style={styles.emphasis}>Mil histórias.</Text></Text>
         <Text style={styles.lead}>Encontre homônimos, participe da sua comunidade e descubra conexões que começam pelo nome.</Text>
+
+        {user ? (
+          <View style={styles.profileCard}>
+            <View style={styles.profileAvatar}><Text style={styles.profileAvatarText}>{user.name.slice(0, 2).toUpperCase()}</Text></View>
+            <View style={styles.profileCopy}><Text style={styles.profileEyebrow}>SEU PERFIL</Text><Text style={styles.profileName}>{user.name}</Text><Text style={styles.profileMeta}>{user.profession || "Membro da comunidade"}{user.city ? ` · ${user.city}` : ""}</Text></View>
+            <Pressable onPress={handleLogout} disabled={loading} style={({ pressed }) => [styles.logoutButton, pressed && styles.pressed]}><Text style={styles.logoutText}>Sair</Text></Pressable>
+          </View>
+        ) : (
+          <View style={styles.authCtaRow}>
+            <Pressable onPress={() => { setAuthMode("login"); setAuthOpen(true); }} style={({ pressed }) => [styles.primarySmall, pressed && styles.pressed]}><Text style={styles.primarySmallText}>Entrar</Text></Pressable>
+            <Pressable onPress={() => { setAuthMode("register"); setAuthOpen(true); }} style={({ pressed }) => [styles.secondarySmall, pressed && styles.pressed]}><Text style={styles.secondarySmallText}>Criar conta</Text></Pressable>
+          </View>
+        )}
+
+        {authOpen && (
+          <View style={styles.authCard}>
+            <View style={styles.authHeader}><Text style={styles.authTitle}>{authMode === "login" ? "Entrar no Homônimos" : "Criar sua conta"}</Text><Pressable onPress={() => setAuthOpen(false)}><Text style={styles.closeText}>Fechar</Text></Pressable></View>
+            {authMode === "register" && <TextInput value={name} onChangeText={setName} placeholder="Nome completo" placeholderTextColor="#8B999D" style={styles.input} autoCapitalize="words" />}
+            <TextInput value={email} onChangeText={setEmail} placeholder="E-mail" placeholderTextColor="#8B999D" style={styles.input} keyboardType="email-address" autoCapitalize="none" />
+            <TextInput value={password} onChangeText={setPassword} placeholder="Senha (mínimo de 8 caracteres)" placeholderTextColor="#8B999D" style={styles.input} secureTextEntry returnKeyType="done" />
+            {authMode === "register" && <><TextInput value={city} onChangeText={setCity} placeholder="Cidade (opcional)" placeholderTextColor="#8B999D" style={styles.input} /><TextInput value={profession} onChangeText={setProfession} placeholder="Profissão (opcional)" placeholderTextColor="#8B999D" style={styles.input} /></>}
+            <Pressable disabled={!canSubmitAuth} onPress={submitAuth} style={({ pressed }) => [styles.button, !canSubmitAuth && styles.buttonDisabled, pressed && styles.pressed]}><Text style={styles.buttonText}>{loading ? "Aguarde…" : authMode === "login" ? "Entrar" : "Criar conta"}</Text></Pressable>
+            <Pressable onPress={() => setAuthMode(authMode === "login" ? "register" : "login")}><Text style={styles.switchText}>{authMode === "login" ? "Ainda não tenho conta" : "Já tenho uma conta"}</Text></Pressable>
+          </View>
+        )}
+
         <View style={styles.searchCard}>
           <Text style={styles.label}>ENCONTRE SEUS HOMÔNIMOS</Text>
           <TextInput value={query} onChangeText={setQuery} placeholder="Digite um nome" placeholderTextColor="#8B999D" style={styles.input} returnKeyType="search" onSubmitEditing={search} />
-          <Pressable disabled={!canSearch || restoringSession} onPress={search} style={({ pressed }) => [styles.button, (!canSearch || restoringSession) && styles.buttonDisabled, pressed && styles.pressed]}><Text style={styles.buttonText}>{restoringSession ? "Conectando…" : loading ? "Buscando…" : "Encontrar"}</Text></Pressable>
+          <Pressable disabled={!canSearch} onPress={search} style={({ pressed }) => [styles.button, !canSearch && styles.buttonDisabled, pressed && styles.pressed]}><Text style={styles.buttonText}>{restoringSession ? "Conectando…" : loading ? "Buscando…" : "Encontrar"}</Text></Pressable>
           <Text style={styles.helper}>Seus dados são protegidos. Nada sensível é exibido.</Text>
         </View>
         <Text style={styles.message}>{message}</Text>
@@ -73,7 +147,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#F7F5EF" },
   content: { padding: 24, paddingBottom: 48 },
-  brandRow: { flexDirection: "row", alignItems: "center", marginBottom: 58 },
+  brandRow: { flexDirection: "row", alignItems: "center", marginBottom: 40 },
   brandMark: { width: 25, height: 25, justifyContent: "center", marginRight: 8 },
   brandDot: { width: 15, height: 15, borderRadius: 8, backgroundColor: "#EB765F" },
   brandDotSecond: { position: "absolute", right: 0, top: 0, width: 13, height: 13, borderRadius: 8, backgroundColor: "#F0C3A7", borderWidth: 3, borderColor: "#F7F5EF" },
@@ -83,13 +157,32 @@ const styles = StyleSheet.create({
   title: { marginTop: 17, color: "#102A43", fontSize: 42, lineHeight: 44, fontWeight: "700", letterSpacing: -1.8 },
   emphasis: { color: "#EB765F" },
   lead: { marginTop: 18, color: "#53687A", fontSize: 15, lineHeight: 23 },
+  authCtaRow: { flexDirection: "row", gap: 10, marginTop: 22 },
+  primarySmall: { paddingVertical: 12, paddingHorizontal: 22, borderRadius: 7, backgroundColor: "#102A43" },
+  primarySmallText: { color: "#FFFFFF", fontSize: 13, fontWeight: "700" },
+  secondarySmall: { paddingVertical: 12, paddingHorizontal: 18, borderRadius: 7, borderWidth: 1, borderColor: "#D8DEDC" },
+  secondarySmallText: { color: "#17324D", fontSize: 13, fontWeight: "700" },
+  profileCard: { flexDirection: "row", alignItems: "center", marginTop: 22, padding: 14, backgroundColor: "#E5F0ED", borderRadius: 10 },
+  profileAvatar: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "#FFFFFF" },
+  profileAvatarText: { color: "#2C695D", fontSize: 12, fontWeight: "700" },
+  profileCopy: { flex: 1, marginLeft: 11 },
+  profileEyebrow: { color: "#5E8682", fontSize: 9, fontWeight: "700", letterSpacing: 1 },
+  profileName: { marginTop: 2, color: "#2C695D", fontSize: 15, fontWeight: "700" },
+  profileMeta: { marginTop: 2, color: "#5E8682", fontSize: 10 },
+  logoutButton: { paddingVertical: 8, paddingHorizontal: 10 },
+  logoutText: { color: "#D85F4A", fontSize: 11, fontWeight: "700" },
+  authCard: { marginTop: 22, padding: 16, backgroundColor: "#FFFDF9", borderRadius: 12, borderWidth: 1, borderColor: "#E5E7E2" },
+  authHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
+  authTitle: { color: "#17324D", fontSize: 17, fontWeight: "700" },
+  closeText: { color: "#D85F4A", fontSize: 11, fontWeight: "700" },
   searchCard: { marginTop: 28, padding: 16, backgroundColor: "#FFFDF9", borderRadius: 12, borderWidth: 1, borderColor: "#E5E7E2" },
   label: { color: "#17324D", fontSize: 10, fontWeight: "700", letterSpacing: 1.2, marginBottom: 9 },
-  input: { height: 47, paddingHorizontal: 13, borderWidth: 1, borderColor: "#DFE5E4", borderRadius: 7, color: "#17324D", fontSize: 14 },
-  button: { height: 47, marginTop: 9, alignItems: "center", justifyContent: "center", borderRadius: 7, backgroundColor: "#102A43" },
+  input: { height: 47, marginBottom: 9, paddingHorizontal: 13, borderWidth: 1, borderColor: "#DFE5E4", borderRadius: 7, color: "#17324D", fontSize: 14, backgroundColor: "#FFFFFF" },
+  button: { height: 47, marginTop: 2, alignItems: "center", justifyContent: "center", borderRadius: 7, backgroundColor: "#102A43" },
   buttonDisabled: { opacity: 0.55 },
   pressed: { transform: [{ scale: 0.98 }], opacity: 0.9 },
   buttonText: { color: "#FFFFFF", fontSize: 13, fontWeight: "700" },
+  switchText: { marginTop: 13, textAlign: "center", color: "#D85F4A", fontSize: 12, fontWeight: "700" },
   helper: { marginTop: 9, color: "#8B999D", fontSize: 10 },
   message: { marginTop: 18, color: "#53687A", fontSize: 12 },
   results: { gap: 10, marginTop: 12 },

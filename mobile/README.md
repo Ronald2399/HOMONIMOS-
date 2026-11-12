@@ -32,7 +32,7 @@ await persistApiSession(api);
 const results = await api.search("Ronaldo");
 ```
 
-A camada mobile ainda precisa receber a identidade visual em Expo e os fluxos nativos de verificação de identidade. Esta separação permite desenvolver Android e iOS sem duplicar regras de negócio.
+A tela inicial mobile já inclui cadastro, login, restauração de sessão, perfil e logout. A identidade visual usa a mesma linguagem do Homônimos web. Fluxos nativos adicionais, como notificações e verificação de identidade, podem ser adicionados sem duplicar as regras do backend.
 
 Antes de abrir o aplicativo, confirme a produção em:
 
