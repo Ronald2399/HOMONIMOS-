@@ -1,18 +1,38 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { HomonimosApi } from "../src/api";
+import { API_URL, HomonimosApi } from "../src/api";
+import { loadSessionToken } from "../src/session";
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
 const api = new HomonimosApi(API_URL);
 
 export default function HomeScreen() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Array<{ id: number; name: string; city: string | null; profession: string | null }>>([]);
   const [loading, setLoading] = useState(false);
+  const [restoringSession, setRestoringSession] = useState(true);
   const [message, setMessage] = useState("Descubra pessoas que compartilham o seu nome.");
 
   const canSearch = useMemo(() => query.trim().length >= 2 && !loading, [query, loading]);
+
+  useEffect(() => {
+    let mounted = true;
+    async function restoreSession() {
+      try {
+        const token = await loadSessionToken();
+        if (token) {
+          api.setSessionToken(token);
+          await api.me();
+        }
+      } catch {
+        // A sessão expirada será tratada pelo próximo login, sem bloquear a busca pública.
+      } finally {
+        if (mounted) setRestoringSession(false);
+      }
+    }
+    void restoreSession();
+    return () => { mounted = false; };
+  }, []);
 
   async function search() {
     if (!canSearch) return;
@@ -39,7 +59,7 @@ export default function HomeScreen() {
         <View style={styles.searchCard}>
           <Text style={styles.label}>ENCONTRE SEUS HOMÔNIMOS</Text>
           <TextInput value={query} onChangeText={setQuery} placeholder="Digite um nome" placeholderTextColor="#8B999D" style={styles.input} returnKeyType="search" onSubmitEditing={search} />
-          <Pressable disabled={!canSearch} onPress={search} style={({ pressed }) => [styles.button, !canSearch && styles.buttonDisabled, pressed && styles.pressed]}><Text style={styles.buttonText}>{loading ? "Buscando…" : "Encontrar"}</Text></Pressable>
+          <Pressable disabled={!canSearch || restoringSession} onPress={search} style={({ pressed }) => [styles.button, (!canSearch || restoringSession) && styles.buttonDisabled, pressed && styles.pressed]}><Text style={styles.buttonText}>{restoringSession ? "Conectando…" : loading ? "Buscando…" : "Encontrar"}</Text></Pressable>
           <Text style={styles.helper}>Seus dados são protegidos. Nada sensível é exibido.</Text>
         </View>
         <Text style={styles.message}>{message}</Text>

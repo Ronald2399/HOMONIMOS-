@@ -22,6 +22,9 @@ export type Post = {
   author: Pick<User, "id" | "name" | "city" | "profession">;
 };
 
+export const PRODUCTION_API_URL = "https://homonimo-prod.onrender.com";
+export const API_URL = process.env.EXPO_PUBLIC_API_URL || PRODUCTION_API_URL;
+
 export class HomonimosApi {
   private readonly baseUrl: string;
   private sessionToken: string | null;
