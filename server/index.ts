@@ -206,7 +206,7 @@ async function start() {
     app.use(vite.middlewares);
   } else {
     app.use(express.static(path.resolve(__dirname, "../dist")));
-    app.get("*", (_req, res) => res.sendFile(path.resolve(__dirname, "../dist/index.html")));
+    app.use((_req, res) => res.sendFile(path.resolve(__dirname, "../dist/index.html")));
   }
   app.listen(port, "0.0.0.0", () => console.log(`Homônimos API running on http://localhost:${port} using ${databaseKind}`));
 }
