@@ -30,7 +30,7 @@ export class HomonimosApi {
   private sessionToken: string | null;
 
   constructor(baseUrl: string, sessionToken?: string | null) {
-    this.baseUrl = baseUrl.replace(/\\/$/, "");
+    this.baseUrl = baseUrl.replace(/\/$/, "");
     this.sessionToken = sessionToken ?? null;
   }
 
