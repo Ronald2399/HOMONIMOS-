@@ -128,10 +128,10 @@ app.get("/api/search", async (req, res) => {
   const currentUser = await resolveUser(req);
   const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   const normalizedQuery = normalize(query);
-  const blockedFilter = currentUser ? "AND u.id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = ?)" : "";
-  const params: unknown[] = currentUser ? [currentUser.id] : [];
-  const rows = await queryMany<UserRow>(`SELECT u.id, u.name, u.city, u.profession, u.bio, u.created_at FROM users u ${blockedFilter} ORDER BY u.name ASC LIMIT 2000`, params);
-  const users = rows.filter((row) => [row.name, row.city || "", row.profession || ""].some((field) => normalize(field).includes(normalizedQuery))).slice(0, 30);
+  const rows = await queryMany<UserRow>("SELECT u.id, u.name, u.city, u.profession, u.bio, u.created_at FROM users u ORDER BY u.name ASC LIMIT 2000");
+  const blockedRows = currentUser ? await queryMany<{ blocked_id: number }>("SELECT blocked_id FROM blocks WHERE blocker_id = ?", [currentUser.id]) : [];
+  const blockedIds = new Set(blockedRows.map((row) => Number(row.blocked_id)));
+  const users = rows.filter((row) => !blockedIds.has(Number(row.id)) && [row.name, row.city || "", row.profession || ""].some((field) => normalize(field).includes(normalizedQuery))).slice(0, 30);
   return res.json({ users: users.map(publicUser) });
 });
 
