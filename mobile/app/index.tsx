@@ -9,13 +9,13 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { API_URL, HomonimosApi, type Community, type User } from "../src/api";
+import { API_URL, HomonimosApi, type Community, type Post, type User } from "../src/api";
 import { persistApiSession, signOut } from "../src/auth";
 import { loadSessionToken } from "../src/session";
 
 const api = new HomonimosApi(API_URL);
 type AuthMode = "login" | "register";
-type Screen = "home" | "communities" | "profile";
+type Screen = "home" | "communities" | "community" | "profile";
 
 function Brand() {
   return (
@@ -55,6 +55,10 @@ export default function HomeScreen() {
   const [password, setPassword] = useState("");
   const [city, setCity] = useState("");
   const [profession, setProfession] = useState("");
+  const [selectedCommunity, setSelectedCommunity] = useState<Community | null>(null);
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [postBody, setPostBody] = useState("");
+  const [postLoading, setPostLoading] = useState(false);
 
   const canSearch = useMemo(() => query.trim().length >= 2 && !loading && !restoringSession, [query, loading, restoringSession]);
   const canSubmitAuth = authMode === "register"
@@ -165,6 +169,38 @@ export default function HomeScreen() {
     }
   }
 
+  async function openCommunity(community: Community) {
+    setSelectedCommunity(community);
+    setPosts([]);
+    setPostBody("");
+    setScreen("community");
+    setPostLoading(true);
+    try {
+      const response = await api.listPosts(community.slug);
+      setPosts(response.posts);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Não foi possível carregar as publicações.");
+    } finally {
+      setPostLoading(false);
+    }
+  }
+
+  async function createPost() {
+    if (!selectedCommunity || !user || postBody.trim().length < 1 || postLoading) return;
+    setPostLoading(true);
+    try {
+      await api.createPost(selectedCommunity.slug, postBody.trim());
+      setPostBody("");
+      const response = await api.listPosts(selectedCommunity.slug);
+      setPosts(response.posts);
+      setMessage("Publicação criada com sucesso.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Não foi possível criar a publicação.");
+    } finally {
+      setPostLoading(false);
+    }
+  }
+
   function openAuth(mode: AuthMode) {
     setAuthMode(mode);
     setAuthOpen(true);
@@ -213,10 +249,24 @@ export default function HomeScreen() {
         {message && <Text style={styles.message}>{message}</Text>}
         {communityLoading && communities.length === 0 ? <ActivityIndicator color="#102A43" style={styles.loader} /> : (
           <FlatList data={communities} scrollEnabled={false} keyExtractor={(item) => String(item.id)} contentContainerStyle={styles.listGap} renderItem={({ item }) => (
-            <View style={styles.communityCard}><View style={styles.communityIcon}><Text style={styles.communityIconText}>{item.name.slice(0, 1).toUpperCase()}</Text></View><View style={styles.communityCopy}><Text style={styles.communityName}>{item.name}</Text><Text style={styles.communityMembers}>{item.memberCount.toLocaleString("pt-BR")} membros</Text></View><Pressable onPress={() => joinCommunity(item)} disabled={communityLoading || item.joined} style={({ pressed }) => [styles.joinButton, item.joined && styles.joinedButton, pressed && styles.pressed]}><Text style={[styles.joinText, item.joined && styles.joinedText]}>{item.joined ? "Participando" : "Entrar"}</Text></Pressable></View>
+            <View style={styles.communityCard}><Pressable onPress={() => openCommunity(item)} style={({ pressed }) => [styles.communityInfoPressable, pressed && styles.pressed]}><View style={styles.communityIcon}><Text style={styles.communityIconText}>{item.name.slice(0, 1).toUpperCase()}</Text></View><View style={styles.communityCopy}><Text style={styles.communityName}>{item.name}</Text><Text style={styles.communityMembers}>{item.memberCount.toLocaleString("pt-BR")} membros</Text></View></Pressable><Pressable onPress={() => joinCommunity(item)} disabled={communityLoading || item.joined} style={({ pressed }) => [styles.joinButton, item.joined && styles.joinedButton, pressed && styles.pressed]}><Text style={[styles.joinText, item.joined && styles.joinedText]}>{item.joined ? "Participando" : "Entrar"}</Text></Pressable></View>
           )} ListEmptyComponent={<Text style={styles.emptyText}>Ainda não há comunidades disponíveis.</Text>} />
         )}
         <View style={styles.safeCard}><Text style={styles.safeTitle}>Convivência segura</Text><Text style={styles.safeCopy}>Respeite os outros membros. Denúncias e bloqueios fazem parte da proteção da comunidade.</Text></View>
+      </View>
+    );
+  }
+
+  function renderCommunityDetail() {
+    if (!selectedCommunity) return null;
+    return (
+      <View>
+        <Pressable onPress={() => setScreen("communities")} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}><Text style={styles.backText}>← Comunidades</Text></Pressable>
+        <View style={styles.communityHero}><View style={styles.largeCommunityIcon}><Text style={styles.largeCommunityIconText}>{selectedCommunity.name.slice(0, 1).toUpperCase()}</Text></View><Text style={styles.sectionTitle}>{selectedCommunity.name}</Text><Text style={styles.sectionLead}>{selectedCommunity.memberCount.toLocaleString("pt-BR")} membros · um espaço para conexões reais.</Text></View>
+        {message && <Text style={styles.message}>{message}</Text>}
+        {user && selectedCommunity.joined ? <View style={styles.postComposer}><Text style={styles.label}>NOVA PUBLICAÇÃO</Text><TextInput value={postBody} onChangeText={setPostBody} placeholder="Compartilhe algo com a comunidade" placeholderTextColor="#8B999D" style={[styles.input, styles.postInput]} multiline maxLength={1000} /><Pressable disabled={postBody.trim().length < 1 || postLoading} onPress={createPost} style={({ pressed }) => [styles.button, (postBody.trim().length < 1 || postLoading) && styles.buttonDisabled, pressed && styles.pressed]}><Text style={styles.buttonText}>{postLoading ? "Publicando…" : "Publicar"}</Text></Pressable></View> : <View style={styles.joinPrompt}><Text style={styles.joinPromptTitle}>Participe da comunidade</Text><Text style={styles.joinPromptCopy}>Entre para publicar e conversar com outros membros.</Text><Pressable onPress={() => joinCommunity(selectedCommunity)} disabled={communityLoading || selectedCommunity.joined} style={({ pressed }) => [styles.button, pressed && styles.pressed]}><Text style={styles.buttonText}>{selectedCommunity.joined ? "Participando" : "Entrar na comunidade"}</Text></Pressable></View>}
+        <Text style={styles.postsTitle}>Publicações recentes</Text>
+        {postLoading && posts.length === 0 ? <ActivityIndicator color="#102A43" style={styles.loader} /> : <FlatList data={posts} scrollEnabled={false} keyExtractor={(item) => String(item.id)} contentContainerStyle={styles.listGap} renderItem={({ item }) => <View style={styles.postCard}><View style={styles.postHeader}><View style={styles.avatar}><Text style={styles.avatarText}>{item.author.name.slice(0, 2).toUpperCase()}</Text></View><View><Text style={styles.postAuthor}>{item.author.name}</Text><Text style={styles.postMeta}>{item.author.profession || "Membro"}</Text></View></View><Text style={styles.postBody}>{item.body}</Text><Text style={styles.postDate}>{new Date(item.createdAt).toLocaleDateString("pt-BR")}</Text></View>} ListEmptyComponent={<Text style={styles.emptyText}>Ainda não há publicações. Seja o primeiro a compartilhar algo.</Text>} />}
       </View>
     );
   }
@@ -237,8 +287,8 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.container}><FlatList data={[screen]} keyExtractor={(item) => item} renderItem={() => <View style={styles.content}><Brand />{screen === "home" ? renderHome() : screen === "communities" ? renderCommunities() : renderProfile()}</View>} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" />
-        <BottomNav screen={screen} onChange={setScreen} />
+      <View style={styles.container}><FlatList data={[screen]} keyExtractor={(item) => item} renderItem={() => <View style={styles.content}><Brand />{screen === "home" ? renderHome() : screen === "communities" ? renderCommunities() : screen === "community" ? renderCommunityDetail() : renderProfile()}</View>} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" />
+        {screen !== "community" && <BottomNav screen={screen} onChange={setScreen} />}
       </View>
     </SafeAreaView>
   );
@@ -306,6 +356,7 @@ const styles = StyleSheet.create({
   sectionLead: { marginTop: 10, color: "#53687A", fontSize: 14, lineHeight: 21 },
   loader: { marginTop: 32 },
   communityCard: { flexDirection: "row", alignItems: "center", padding: 14, backgroundColor: "#FFFDF9", borderRadius: 10, borderWidth: 1, borderColor: "#E7E9E5" },
+  communityInfoPressable: { flex: 1, flexDirection: "row", alignItems: "center" },
   communityIcon: { width: 42, height: 42, borderRadius: 21, alignItems: "center", justifyContent: "center", backgroundColor: "#D7E8F4" },
   communityIconText: { color: "#17324D", fontSize: 15, fontWeight: "700" },
   communityCopy: { flex: 1, marginLeft: 11 },
@@ -316,6 +367,23 @@ const styles = StyleSheet.create({
   joinedButton: { backgroundColor: "#E5F0ED" },
   joinedText: { color: "#2C695D" },
   emptyText: { marginTop: 24, color: "#53687A", fontSize: 13 },
+  backButton: { alignSelf: "flex-start", paddingVertical: 5, paddingHorizontal: 2, marginBottom: 16 },
+  backText: { color: "#D85F4A", fontSize: 12, fontWeight: "700" },
+  communityHero: { alignItems: "center", paddingVertical: 4 },
+  largeCommunityIcon: { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center", backgroundColor: "#D7E8F4", marginBottom: 13 },
+  largeCommunityIconText: { color: "#17324D", fontSize: 22, fontWeight: "700" },
+  postComposer: { marginTop: 22, padding: 16, backgroundColor: "#FFFDF9", borderRadius: 12, borderWidth: 1, borderColor: "#E5E7E2" },
+  postInput: { height: 90, paddingTop: 13, textAlignVertical: "top" },
+  joinPrompt: { marginTop: 22, padding: 16, backgroundColor: "#E5F0ED", borderRadius: 10 },
+  joinPromptTitle: { color: "#2C695D", fontSize: 13, fontWeight: "700" },
+  joinPromptCopy: { marginTop: 5, marginBottom: 13, color: "#5E8682", fontSize: 11, lineHeight: 17 },
+  postsTitle: { marginTop: 28, color: "#102A43", fontSize: 16, fontWeight: "700" },
+  postCard: { padding: 15, backgroundColor: "#FFFDF9", borderRadius: 10, borderWidth: 1, borderColor: "#E7E9E5" },
+  postHeader: { flexDirection: "row", alignItems: "center" },
+  postAuthor: { color: "#102A43", fontSize: 13, fontWeight: "700" },
+  postMeta: { marginTop: 3, color: "#89979A", fontSize: 10 },
+  postBody: { marginTop: 13, color: "#53687A", fontSize: 13, lineHeight: 20 },
+  postDate: { marginTop: 11, color: "#A0AAAC", fontSize: 10 },
   profilePanel: { marginTop: 22, padding: 20, alignItems: "center", backgroundColor: "#FFFDF9", borderRadius: 12, borderWidth: 1, borderColor: "#E5E7E2" },
   largeAvatar: { width: 76, height: 76, borderRadius: 38, alignItems: "center", justifyContent: "center", backgroundColor: "#D7E8F4" },
   largeAvatarText: { color: "#17324D", fontSize: 20, fontWeight: "700" },
