@@ -126,11 +126,21 @@ app.get("/api/search", async (req, res) => {
   const query = String(req.query.q || "").trim();
   if (query.length < 2) return res.json({ users: [] });
   const currentUser = await resolveUser(req);
-  const params: unknown[] = [`%${query}%`, `%${query}%`, `%${query}%`];
+  const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const normalizedQuery = normalize(query);
   const blockedFilter = currentUser ? "AND u.id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = ?)" : "";
-  if (currentUser) params.push(currentUser.id);
-  const rows = await queryMany<UserRow>(`SELECT u.id, u.name, u.city, u.profession, u.bio, u.created_at FROM users u WHERE (LOWER(u.name) LIKE LOWER(?) OR LOWER(COALESCE(u.city, '')) LIKE LOWER(?) OR LOWER(COALESCE(u.profession, '')) LIKE LOWER(?)) ${blockedFilter} ORDER BY u.name ASC LIMIT 30`, params);
-  return res.json({ users: rows.map(publicUser) });
+  const params: unknown[] = currentUser ? [currentUser.id] : [];
+  const rows = await queryMany<UserRow>(`SELECT u.id, u.name, u.city, u.profession, u.bio, u.created_at FROM users u ${blockedFilter} ORDER BY u.name ASC LIMIT 2000`, params);
+  const users = rows.filter((row) => [row.name, row.city || "", row.profession || ""].some((field) => normalize(field).includes(normalizedQuery))).slice(0, 30);
+  return res.json({ users: users.map(publicUser) });
+});
+
+app.get("/api/communities", async (req, res) => {
+  const user = await resolveUser(req);
+  const rows = await queryMany<{ id: number; slug: string; display_name: string; member_count: number }>("SELECT id, slug, display_name, member_count FROM communities ORDER BY member_count DESC, display_name ASC LIMIT 50");
+  const memberships = user ? await queryMany<{ community_id: number }>("SELECT community_id FROM memberships WHERE user_id = ?", [user.id]) : [];
+  const joined = new Set(memberships.map((membership) => Number(membership.community_id)));
+  return res.json({ communities: rows.map((row) => ({ id: row.id, slug: row.slug, name: row.display_name, memberCount: row.member_count, joined: joined.has(Number(row.id)) })) });
 });
 
 app.get("/api/communities/:slug", async (req, res) => {

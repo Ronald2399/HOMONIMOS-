@@ -77,6 +77,10 @@ export class HomonimosApi {
     return this.request<{ users: User[] }>(`/api/search?q=${encodeURIComponent(name)}`);
   }
 
+  async listCommunities() {
+    return this.request<{ communities: Community[] }>("/api/communities");
+  }
+
   async getCommunity(slug: string) {
     return this.request<{ community: Community }>(`/api/communities/${encodeURIComponent(slug)}`);
   }
