@@ -77,6 +77,10 @@ export default function HomeScreen() {
   const [settingsPrivacyExpanded, setSettingsPrivacyExpanded] = useState(false);
   const [notifyCommunities, setNotifyCommunities] = useState(true);
   const [notifyReplies, setNotifyReplies] = useState(true);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   const canSearch = useMemo(() => query.trim().length >= 2 && !loading && !restoringSession, [query, loading, restoringSession]);
   const canSubmitAuth = authMode === "register"
@@ -186,6 +190,24 @@ export default function HomeScreen() {
       setNotifyCommunities(user.notifyCommunities);
       setNotifyReplies(user.notifyReplies);
       setMessage(error instanceof Error ? error.message : "Não foi possível salvar a preferência.");
+    } finally {
+      setSettingsLoading(false);
+    }
+  }
+
+  async function submitPasswordChange() {
+    if (newPassword.length < 8 || newPassword !== confirmPassword || settingsLoading) return;
+    setSettingsLoading(true);
+    setMessage("");
+    try {
+      await api.changePassword(currentPassword, newPassword);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setChangePasswordOpen(false);
+      setMessage("Senha alterada com sucesso.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Não foi possível alterar a senha.");
     } finally {
       setSettingsLoading(false);
     }
@@ -517,13 +539,30 @@ export default function HomeScreen() {
   function renderSettings() {
     return (
       <View>
+        {changePasswordOpen ? <>
+        <Pressable accessibilityRole="button" accessibilityLabel="Voltar para configurações" onPress={() => setChangePasswordOpen(false)} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}><Text style={styles.backIcon}>‹</Text><Text style={styles.backText}>Configurações</Text></Pressable>
+        <Text style={styles.sectionTitle}>Alterar senha</Text>
+        <Text style={styles.sectionLead}>Use uma senha forte e diferente de outras contas.</Text>
+        <View style={styles.editProfilePanel}>
+          <Text style={styles.passwordSecurityTitle}>Proteja sua conta</Text>
+          <Text style={styles.passwordSecurityCopy}>Sua senha nunca é exibida para ninguém.</Text>
+          <TextInput value={currentPassword} onChangeText={setCurrentPassword} placeholder="Senha atual" placeholderTextColor="#8B999D" style={styles.input} secureTextEntry />
+          <TextInput value={newPassword} onChangeText={setNewPassword} placeholder="Nova senha (mínimo de 8 caracteres)" placeholderTextColor="#8B999D" style={styles.input} secureTextEntry />
+          <TextInput value={confirmPassword} onChangeText={setConfirmPassword} placeholder="Confirme a nova senha" placeholderTextColor="#8B999D" style={styles.input} secureTextEntry />
+          {newPassword.length > 0 && newPassword.length < 8 && <Text style={styles.passwordError}>A nova senha precisa ter pelo menos 8 caracteres.</Text>}
+          {confirmPassword.length > 0 && newPassword !== confirmPassword && <Text style={styles.passwordError}>As senhas não conferem.</Text>}
+          <Pressable onPress={() => void submitPasswordChange()} disabled={!currentPassword || newPassword.length < 8 || newPassword !== confirmPassword || settingsLoading} style={({ pressed }) => [styles.button, (!currentPassword || newPassword.length < 8 || newPassword !== confirmPassword || settingsLoading) && styles.buttonDisabled, pressed && styles.pressed]}><Text style={styles.buttonText}>{settingsLoading ? "Salvando…" : "Alterar senha"}</Text></Pressable>
+          <Pressable onPress={() => setChangePasswordOpen(false)} style={({ pressed }) => [styles.cancelEditButton, pressed && styles.pressed]}><Text style={styles.cancelEditText}>Cancelar</Text></Pressable>
+        </View>
+        {message && <Text style={styles.message}>{message}</Text>}
+        </> : <>
         <Pressable accessibilityRole="button" accessibilityLabel="Voltar para o perfil" onPress={() => setScreen("profile")} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}><Text style={styles.backIcon}>‹</Text><Text style={styles.backText}>Perfil</Text></Pressable>
         <Text style={styles.sectionTitle}>Configurações</Text>
         <Text style={styles.sectionLead}>Tudo o que você precisa para cuidar da sua conta e da sua privacidade.</Text>
         <Text style={styles.settingsSectionLabel}>CONTA</Text>
         <View style={styles.settingsCard}>
           <Pressable onPress={() => setScreen("profile")} style={({ pressed }) => [styles.settingsRow, pressed && styles.pressed]}><View style={styles.settingsRowCopy}><Text style={styles.settingsRowTitle}>Editar perfil</Text><Text style={styles.settingsRowHint}>Nome, cidade, profissão e biografia</Text></View><Text style={styles.settingsChevron}>›</Text></Pressable>
-          <Pressable onPress={() => showPlannedFeature("Alterar senha")} style={({ pressed }) => [styles.settingsRow, pressed && styles.pressed]}><View style={styles.settingsRowCopy}><Text style={styles.settingsRowTitle}>Alterar senha</Text><Text style={styles.settingsRowHint}>Mantenha sua conta protegida</Text></View><Text style={styles.settingsChevron}>›</Text></Pressable>
+          <Pressable onPress={() => { setMessage(""); setChangePasswordOpen(true); }} style={({ pressed }) => [styles.settingsRow, pressed && styles.pressed]}><View style={styles.settingsRowCopy}><Text style={styles.settingsRowTitle}>Alterar senha</Text><Text style={styles.settingsRowHint}>Mantenha sua conta protegida</Text></View><Text style={styles.settingsChevron}>›</Text></Pressable>
           <Pressable onPress={() => showPlannedFeature("Excluir conta")} style={({ pressed }) => [styles.settingsRow, styles.dangerRow, pressed && styles.pressed]}><View style={styles.settingsRowCopy}><Text style={styles.dangerText}>Excluir conta</Text><Text style={styles.settingsRowHint}>Esta ação será irreversível</Text></View><Text style={styles.settingsChevron}>›</Text></Pressable>
         </View>
         <Text style={styles.settingsSectionLabel}>PRIVACIDADE</Text>
@@ -545,6 +584,7 @@ export default function HomeScreen() {
           <Pressable onPress={() => showPlannedFeature("Falar com o suporte")} style={({ pressed }) => [styles.settingsRow, pressed && styles.pressed]}><View style={styles.settingsRowCopy}><Text style={styles.settingsRowTitle}>Falar com o suporte</Text><Text style={styles.settingsRowHint}>Ajuda para usar o aplicativo</Text></View><Text style={styles.settingsChevron}>›</Text></Pressable>
         </View>
         {message && <Text style={styles.message}>{message}</Text>}
+        </>}
       </View>
     );
   }
@@ -726,6 +766,9 @@ const styles = StyleSheet.create({
   cancelReplyText: { color: "#D85F4A", fontSize: 10, fontWeight: "700" },
   profilePanel: { marginTop: 22, padding: 24, alignItems: "center", backgroundColor: "#FFFDF9", borderRadius: 16, borderWidth: 1, borderColor: "#E5E7E2", shadowColor: "#17324D", shadowOpacity: 0.05, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2 },
   editProfilePanel: { marginTop: 22, padding: 20, alignItems: "stretch", backgroundColor: "#FFFDF9", borderRadius: 16, borderWidth: 1, borderColor: "#E5E7E2", shadowColor: "#17324D", shadowOpacity: 0.05, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2 },
+  passwordSecurityTitle: { color: "#102A43", fontSize: 18, fontWeight: "800", marginBottom: 6 },
+  passwordSecurityCopy: { color: "#5B6B73", fontSize: 13, lineHeight: 20, marginBottom: 12 },
+  passwordError: { color: "#B5453B", fontSize: 12, marginTop: -4, marginBottom: 8 },
   profileIdentity: { alignItems: "center", marginBottom: 2 },
   largeAvatar: { width: 76, height: 76, borderRadius: 38, alignItems: "center", justifyContent: "center", backgroundColor: "#D7E8F4" },
   largeAvatarText: { color: "#17324D", fontSize: 20, fontWeight: "700" },

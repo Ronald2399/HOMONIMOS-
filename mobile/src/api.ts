@@ -87,6 +87,10 @@ export class HomonimosApi {
     return this.request<{ preferences: { notifyCommunities: boolean; notifyReplies: boolean } }>("/api/auth/preferences", { method: "PATCH", body: JSON.stringify(input) });
   }
 
+  async changePassword(currentPassword: string, newPassword: string) {
+    return this.request<{ changed: boolean; message: string }>("/api/auth/password", { method: "PATCH", body: JSON.stringify({ currentPassword, newPassword }) });
+  }
+
   async logout() {
     await this.request<void>("/api/auth/logout", { method: "POST" });
     this.sessionToken = null;
