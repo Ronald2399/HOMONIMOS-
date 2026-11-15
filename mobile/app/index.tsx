@@ -10,7 +10,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { API_URL, HomonimosApi, type Community, type Post, type User } from "../src/api";
+import { API_URL, HomonimosApi, type Comment, type Community, type Post, type User } from "../src/api";
 import { persistApiSession, signOut } from "../src/auth";
 import { loadSessionToken } from "../src/session";
 
@@ -62,6 +62,11 @@ export default function HomeScreen() {
   const [postLoading, setPostLoading] = useState(false);
   const [editingPostId, setEditingPostId] = useState<number | null>(null);
   const [editingPostBody, setEditingPostBody] = useState("");
+  const [commentsByPost, setCommentsByPost] = useState<Record<number, Comment[]>>({});
+  const [expandedPostId, setExpandedPostId] = useState<number | null>(null);
+  const [commentDraft, setCommentDraft] = useState("");
+  const [replyingTo, setReplyingTo] = useState<Comment | null>(null);
+  const [commentLoading, setCommentLoading] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileName, setProfileName] = useState("");
   const [profileCity, setProfileCity] = useState("");
@@ -215,6 +220,10 @@ export default function HomeScreen() {
   async function openCommunity(community: Community) {
     setSelectedCommunity(community);
     setPosts([]);
+    setCommentsByPost({});
+    setExpandedPostId(null);
+    setReplyingTo(null);
+    setCommentDraft("");
     setPostBody("");
     setScreen("community");
     setPostLoading(true);
@@ -285,6 +294,42 @@ export default function HomeScreen() {
         }
       } },
     ]);
+  }
+
+  async function toggleComments(post: Post) {
+    if (expandedPostId === post.id) {
+      setExpandedPostId(null);
+      setReplyingTo(null);
+      return;
+    }
+    setExpandedPostId(post.id);
+    if (commentsByPost[post.id]) return;
+    setCommentLoading(true);
+    try {
+      const response = await api.listComments(post.id);
+      setCommentsByPost((current) => ({ ...current, [post.id]: response.comments }));
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Não foi possível carregar os comentários.");
+    } finally {
+      setCommentLoading(false);
+    }
+  }
+
+  async function submitComment(post: Post) {
+    if (!user || commentDraft.trim().length < 1 || commentLoading) return;
+    setCommentLoading(true);
+    try {
+      const response = await api.createComment(post.id, commentDraft.trim(), replyingTo?.id);
+      setCommentsByPost((current) => ({ ...current, [post.id]: [...(current[post.id] || []), response.comment] }));
+      setCommentDraft("");
+      setReplyingTo(null);
+      setExpandedPostId(post.id);
+      setMessage("Comentário publicado com sucesso.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Não foi possível publicar o comentário.");
+    } finally {
+      setCommentLoading(false);
+    }
   }
 
   function reportPost(post: Post) {
@@ -400,6 +445,16 @@ export default function HomeScreen() {
     );
   }
 
+  function renderCommentItem(comment: Comment, post: Post) {
+    return (
+      <View key={comment.id} style={[styles.commentRow, comment.parentId && styles.replyRow]}>
+        <Text style={styles.commentAuthor}>{comment.author.name}</Text>
+        <Text style={styles.commentBody}>{comment.body}</Text>
+        <Pressable onPress={() => { setReplyingTo(comment); setExpandedPostId(post.id); }}><Text style={styles.replyText}>Responder</Text></Pressable>
+      </View>
+    );
+  }
+
   function renderPostCard(post: Post) {
     const isOwnPost = Boolean(user && post.author.id === user.id);
     const isEditing = editingPostId === post.id;
@@ -409,6 +464,11 @@ export default function HomeScreen() {
         {isEditing ? <View style={styles.editPostBox}><TextInput value={editingPostBody} onChangeText={setEditingPostBody} style={[styles.input, styles.editPostInput]} multiline maxLength={1000} autoFocus /><View style={styles.editPostActions}><Pressable onPress={cancelPostEdit} disabled={postLoading}><Text style={styles.cancelPostText}>Cancelar</Text></Pressable><Pressable onPress={savePostEdit} disabled={editingPostBody.trim().length < 1 || postLoading} style={[styles.savePostButton, (editingPostBody.trim().length < 1 || postLoading) && styles.buttonDisabled]}><Text style={styles.savePostText}>{postLoading ? "Salvando…" : "Salvar"}</Text></Pressable></View></View> : <Text style={styles.postBody}>{post.body}</Text>}
         <Text style={styles.postDate}>{new Date(post.createdAt).toLocaleDateString("pt-BR")}</Text>
         {user && <View style={styles.safetyActions}>{isOwnPost ? <><Pressable onPress={() => startPostEdit(post)} disabled={postLoading || isEditing}><Text style={styles.safetyActionText}>Editar</Text></Pressable><Pressable onPress={() => deletePost(post)} disabled={postLoading || isEditing}><Text style={styles.safetyActionText}>Excluir</Text></Pressable></> : <><Pressable onPress={() => reportPost(post)}><Text style={styles.safetyActionText}>Denunciar</Text></Pressable><Pressable onPress={() => blockAuthor(post)}><Text style={styles.safetyActionText}>Bloquear autor</Text></Pressable></>}</View>}
+        <Pressable onPress={() => toggleComments(post)} style={({ pressed }) => [styles.commentsToggle, pressed && styles.pressed]}><Text style={styles.commentsToggleText}>{expandedPostId === post.id ? "Ocultar comentários" : "Comentários e respostas"}</Text></Pressable>
+        {expandedPostId === post.id && <View style={styles.commentsBox}>
+          {commentLoading && !commentsByPost[post.id] ? <ActivityIndicator color="#2C695D" /> : (commentsByPost[post.id] || []).length === 0 ? <Text style={styles.noComments}>Ainda não há comentários. Seja o primeiro.</Text> : (commentsByPost[post.id] || []).map((comment) => renderCommentItem(comment, post))}
+          {user && <View style={styles.commentComposer}>{replyingTo && <View style={styles.replyingRow}><Text style={styles.replyingText}>Respondendo a {replyingTo.author.name}</Text><Pressable onPress={() => setReplyingTo(null)}><Text style={styles.cancelReplyText}>Cancelar</Text></Pressable></View>}<TextInput value={commentDraft} onChangeText={setCommentDraft} placeholder={replyingTo ? "Escreva sua resposta" : "Escreva um comentário"} placeholderTextColor="#8B999D" style={[styles.input, styles.commentInput]} multiline maxLength={500} /><Pressable disabled={commentDraft.trim().length < 1 || commentLoading} onPress={() => submitComment(post)} style={({ pressed }) => [styles.commentButton, (commentDraft.trim().length < 1 || commentLoading) && styles.buttonDisabled, pressed && styles.pressed]}><Text style={styles.commentButtonText}>{commentLoading ? "Enviando…" : replyingTo ? "Responder" : "Comentar"}</Text></Pressable></View>}
+        </View>}
       </View>
     );
   }
@@ -603,6 +663,22 @@ const styles = StyleSheet.create({
   savePostText: { color: "#FFFFFF", fontSize: 11, fontWeight: "700" },
   safetyActions: { flexDirection: "row", gap: 18, marginTop: 13, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#EEF0ED" },
   safetyActionText: { color: "#D85F4A", fontSize: 10, fontWeight: "700" },
+  commentsToggle: { marginTop: 12, paddingVertical: 8 },
+  commentsToggleText: { color: "#2C695D", fontSize: 11, fontWeight: "700" },
+  commentsBox: { marginTop: 4, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#EEF0ED" },
+  noComments: { color: "#89979A", fontSize: 11, lineHeight: 17 },
+  commentRow: { paddingVertical: 9, paddingHorizontal: 10, backgroundColor: "#F5F8F6", borderRadius: 7, marginBottom: 7 },
+  replyRow: { marginLeft: 16, backgroundColor: "#EDF4F1" },
+  commentAuthor: { color: "#17324D", fontSize: 11, fontWeight: "700" },
+  commentBody: { marginTop: 3, color: "#53687A", fontSize: 11, lineHeight: 17 },
+  replyText: { marginTop: 5, color: "#D85F4A", fontSize: 10, fontWeight: "700" },
+  commentComposer: { marginTop: 8 },
+  commentInput: { height: 64, paddingTop: 10, textAlignVertical: "top", fontSize: 12 },
+  commentButton: { alignSelf: "flex-end", paddingVertical: 9, paddingHorizontal: 14, borderRadius: 7, backgroundColor: "#2C695D" },
+  commentButtonText: { color: "#FFFFFF", fontSize: 10, fontWeight: "700" },
+  replyingRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 7 },
+  replyingText: { color: "#53687A", fontSize: 10 },
+  cancelReplyText: { color: "#D85F4A", fontSize: 10, fontWeight: "700" },
   profilePanel: { marginTop: 22, padding: 24, alignItems: "center", backgroundColor: "#FFFDF9", borderRadius: 16, borderWidth: 1, borderColor: "#E5E7E2", shadowColor: "#17324D", shadowOpacity: 0.05, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2 },
   profileIdentity: { alignItems: "center", marginBottom: 2 },
   largeAvatar: { width: 76, height: 76, borderRadius: 38, alignItems: "center", justifyContent: "center", backgroundColor: "#D7E8F4" },

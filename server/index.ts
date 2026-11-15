@@ -81,6 +81,7 @@ async function requireAuth(req: AuthRequest, res: Response, next: NextFunction) 
 const registerSchema = z.object({ name: z.string().trim().min(2).max(80), email: z.string().trim().email().max(160), password: z.string().min(8).max(128), city: z.string().trim().max(90).optional(), profession: z.string().trim().max(90).optional() }).strict();
 const loginSchema = z.object({ email: z.string().trim().email(), password: z.string().min(1).max(128) }).strict();
 const postSchema = z.object({ body: z.string().trim().min(1).max(1000) }).strict();
+const commentSchema = z.object({ body: z.string().trim().min(1).max(500), parentId: z.number().int().positive().optional() }).strict();
 const reportSchema = z.object({ targetType: z.enum(["user", "post"]), targetId: z.number().int().positive(), reason: z.string().trim().min(3).max(120), details: z.string().trim().max(500).optional() }).strict();
 const blockSchema = z.object({ userId: z.number().int().positive() }).strict();
 const profileSchema = z.object({ name: z.string().trim().min(2).max(80), city: z.string().trim().max(90), profession: z.string().trim().max(90), bio: z.string().trim().max(240) }).strict();
@@ -207,6 +208,34 @@ app.delete("/api/posts/:postId", requireAuth, async (req: AuthRequest, res) => {
   if (Number(post.user_id) !== req.user!.id) return res.status(403).json({ error: "FORBIDDEN", message: "Você só pode excluir suas próprias publicações." });
   await execute("DELETE FROM posts WHERE id = ?", [post.id]);
   return res.status(204).send();
+});
+
+app.get("/api/posts/:postId/comments", async (req, res) => {
+  const post = await queryOne<{ id: number }>("SELECT id FROM posts WHERE id = ?", [Number(req.params.postId)]);
+  if (!post) return res.status(404).json({ error: "NOT_FOUND", message: "Publicação não encontrada." });
+  const user = await resolveUser(req);
+  const params: unknown[] = [post.id];
+  const blockedFilter = user ? "AND c.user_id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = ?)" : "";
+  if (user) params.push(user.id);
+  const rows = await queryMany<{ id: number; body: string; created_at: string; parent_id: number | null; user_id: number; name: string; profession: string | null }>(`SELECT c.id, c.body, c.created_at, c.parent_id, u.id AS user_id, u.name, u.profession FROM comments c JOIN users u ON u.id = c.user_id WHERE c.post_id = ? ${blockedFilter} ORDER BY c.created_at ASC LIMIT 100`, params);
+  return res.json({ comments: rows.map((comment) => ({ id: comment.id, body: comment.body, createdAt: comment.created_at, parentId: comment.parent_id, author: { id: comment.user_id, name: comment.name, profession: comment.profession } })) });
+});
+
+app.post("/api/posts/:postId/comments", requireAuth, async (req: AuthRequest, res) => {
+  const parsed = commentSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "INVALID_INPUT", message: "O comentário deve ter entre 1 e 500 caracteres." });
+  const post = await queryOne<{ id: number; community_id: number }>("SELECT id, community_id FROM posts WHERE id = ?", [Number(req.params.postId)]);
+  if (!post) return res.status(404).json({ error: "NOT_FOUND", message: "Publicação não encontrada." });
+  const membership = await queryOne("SELECT 1 FROM memberships WHERE user_id = ? AND community_id = ?", [req.user!.id, post.community_id]);
+  if (!membership) return res.status(403).json({ error: "JOIN_REQUIRED", message: "Entre na comunidade antes de comentar." });
+  if (parsed.data.parentId) {
+    const parent = await queryOne<{ id: number }>("SELECT id FROM comments WHERE id = ? AND post_id = ?", [parsed.data.parentId, post.id]);
+    if (!parent) return res.status(400).json({ error: "INVALID_PARENT", message: "A resposta selecionada não existe mais." });
+  }
+  const inserted = await queryOne<{ id: number }>("INSERT INTO comments (post_id, user_id, parent_id, body) VALUES (?, ?, ?, ?) RETURNING id", [post.id, req.user!.id, parsed.data.parentId || null, parsed.data.body]);
+  const comment = await queryOne<{ id: number; body: string; created_at: string; parent_id: number | null; user_id: number; name: string; profession: string | null }>("SELECT c.id, c.body, c.created_at, c.parent_id, u.id AS user_id, u.name, u.profession FROM comments c JOIN users u ON u.id = c.user_id WHERE c.id = ?", [inserted?.id]);
+  if (!comment) return res.status(500).json({ error: "COMMENT_CREATE_FAILED", message: "Não foi possível criar o comentário." });
+  return res.status(201).json({ comment: { id: comment.id, body: comment.body, createdAt: comment.created_at, parentId: comment.parent_id, author: { id: comment.user_id, name: comment.name, profession: comment.profession } } });
 });
 
 app.post("/api/reports", requireAuth, async (req: AuthRequest, res) => {

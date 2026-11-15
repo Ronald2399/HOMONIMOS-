@@ -45,6 +45,16 @@ CREATE TABLE IF NOT EXISTS posts (
 );
 CREATE INDEX IF NOT EXISTS posts_community_created_idx ON posts(community_id, created_at DESC);
 
+CREATE TABLE IF NOT EXISTS comments (
+  id BIGSERIAL PRIMARY KEY,
+  post_id BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  parent_id BIGINT REFERENCES comments(id) ON DELETE CASCADE,
+  body VARCHAR(500) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS comments_post_created_idx ON comments(post_id, created_at ASC);
+
 CREATE TABLE IF NOT EXISTS reports (
   id BIGSERIAL PRIMARY KEY,
   reporter_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

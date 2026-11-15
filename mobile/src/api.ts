@@ -22,6 +22,14 @@ export type Post = {
   author: Pick<User, "id" | "name" | "city" | "profession">;
 };
 
+export type Comment = {
+  id: number;
+  body: string;
+  createdAt: string;
+  parentId: number | null;
+  author: Pick<User, "id" | "name" | "profession">;
+};
+
 export const PRODUCTION_API_URL = "https://homonimo-prod.onrender.com";
 export const API_URL = process.env.EXPO_PUBLIC_API_URL || PRODUCTION_API_URL;
 
@@ -108,6 +116,14 @@ export class HomonimosApi {
 
   async deletePost(postId: number) {
     return this.request<void>(`/api/posts/${postId}`, { method: "DELETE" });
+  }
+
+  async listComments(postId: number) {
+    return this.request<{ comments: Comment[] }>(`/api/posts/${postId}/comments`);
+  }
+
+  async createComment(postId: number, body: string, parentId?: number | null) {
+    return this.request<{ comment: Comment }>(`/api/posts/${postId}/comments`, { method: "POST", body: JSON.stringify({ body, parentId: parentId || undefined }) });
   }
 
   async report(targetType: "user" | "post", targetId: number, reason: string, details?: string) {
