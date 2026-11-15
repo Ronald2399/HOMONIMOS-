@@ -323,7 +323,7 @@ export default function HomeScreen() {
         )}
         <View style={styles.searchCard}>
           <Text style={styles.label}>ENCONTRE SEUS HOMÔNIMOS</Text>
-          <TextInput value={query} onChangeText={setQuery} placeholder="Digite um nome" placeholderTextColor="#8B999D" style={styles.input} returnKeyType="search" onSubmitEditing={search} />
+          <TextInput value={query} onChangeText={(value) => { setQuery(value); setMessage(""); }} placeholder="Digite um nome" placeholderTextColor="#8B999D" style={styles.input} returnKeyType="search" onSubmitEditing={search} />
           <Pressable disabled={!canSearch} onPress={search} style={({ pressed }) => [styles.button, !canSearch && styles.buttonDisabled, pressed && styles.pressed]}><Text style={styles.buttonText}>{restoringSession ? "Conectando…" : loading ? "Buscando…" : "Encontrar"}</Text></Pressable>
           <Text style={styles.helper}>A busca aceita nomes com ou sem acento. Seus dados são protegidos.</Text>
         </View>
@@ -448,9 +448,9 @@ const styles = StyleSheet.create({
   profileCard: { flexDirection: "row", alignItems: "center", marginTop: 22, padding: 14, backgroundColor: "#E5F0ED", borderRadius: 10 },
   profileAvatar: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "#FFFFFF" },
   profileAvatarText: { color: "#2C695D", fontSize: 12, fontWeight: "700" },
-  profileCopy: { flex: 1, marginLeft: 11 },
+  profileCopy: { flex: 1, minWidth: 0, marginLeft: 11 },
   profileEyebrow: { color: "#5E8682", fontSize: 9, fontWeight: "700", letterSpacing: 1 },
-  profileName: { marginTop: 2, color: "#2C695D", fontSize: 15, fontWeight: "700" },
+  profileName: { marginTop: 2, color: "#2C695D", fontSize: 14, fontWeight: "700" },
   profileMeta: { marginTop: 2, color: "#5E8682", fontSize: 10 },
   logoutButton: { paddingVertical: 8, paddingHorizontal: 10 },
   logoutText: { color: "#D85F4A", fontSize: 11, fontWeight: "700" },
