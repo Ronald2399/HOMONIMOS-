@@ -60,6 +60,11 @@ export default function HomeScreen() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [postBody, setPostBody] = useState("");
   const [postLoading, setPostLoading] = useState(false);
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [profileName, setProfileName] = useState("");
+  const [profileCity, setProfileCity] = useState("");
+  const [profileProfession, setProfileProfession] = useState("");
+  const [profileBio, setProfileBio] = useState("");
 
   const canSearch = useMemo(() => query.trim().length >= 2 && !loading && !restoringSession, [query, loading, restoringSession]);
   const canSubmitAuth = authMode === "register"
@@ -239,6 +244,30 @@ export default function HomeScreen() {
     setScreen("profile");
   }
 
+  function startProfileEdit() {
+    if (!user) return;
+    setProfileName(user.name);
+    setProfileCity(user.city || "");
+    setProfileProfession(user.profession || "");
+    setProfileBio(user.bio || "");
+    setEditingProfile(true);
+  }
+
+  async function saveProfile() {
+    if (!user || profileName.trim().length < 2 || loading) return;
+    setLoading(true);
+    try {
+      const updated = await api.updateProfile({ name: profileName.trim(), city: profileCity.trim(), profession: profileProfession.trim(), bio: profileBio.trim() });
+      setUser(updated);
+      setEditingProfile(false);
+      setMessage("Perfil atualizado com sucesso.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Não foi possível atualizar o perfil.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function renderHome() {
     return (
       <View>
@@ -307,7 +336,7 @@ export default function HomeScreen() {
       <View>
         <Text style={styles.sectionTitle}>Seu perfil</Text>
         {user ? (
-          <View style={styles.profilePanel}><View style={styles.largeAvatar}><Text style={styles.largeAvatarText}>{user.name.slice(0, 2).toUpperCase()}</Text></View><Text style={styles.panelName}>{user.name}</Text><Text style={styles.panelMeta}>{user.profession || "Membro da comunidade"}{user.city ? ` · ${user.city}` : ""}</Text><Text style={styles.panelBio}>{user.bio || "Seu perfil está protegido. Compartilhe apenas o que fizer sentido para você."}</Text><Pressable onPress={handleLogout} disabled={loading} style={({ pressed }) => [styles.button, pressed && styles.pressed]}><Text style={styles.buttonText}>{loading ? "Saindo…" : "Sair da conta"}</Text></Pressable></View>
+          <View style={styles.profilePanel}><View style={styles.largeAvatar}><Text style={styles.largeAvatarText}>{user.name.slice(0, 2).toUpperCase()}</Text></View>{editingProfile ? <><TextInput value={profileName} onChangeText={setProfileName} placeholder="Nome completo" placeholderTextColor="#8B999D" style={styles.input} /><TextInput value={profileCity} onChangeText={setProfileCity} placeholder="Cidade" placeholderTextColor="#8B999D" style={styles.input} /><TextInput value={profileProfession} onChangeText={setProfileProfession} placeholder="Profissão" placeholderTextColor="#8B999D" style={styles.input} /><TextInput value={profileBio} onChangeText={setProfileBio} placeholder="Biografia curta" placeholderTextColor="#8B999D" style={[styles.input, styles.bioInput]} multiline maxLength={240} /><Pressable onPress={saveProfile} disabled={loading || profileName.trim().length < 2} style={({ pressed }) => [styles.button, (loading || profileName.trim().length < 2) && styles.buttonDisabled, pressed && styles.pressed]}><Text style={styles.buttonText}>{loading ? "Salvando…" : "Salvar perfil"}</Text></Pressable><Pressable onPress={() => setEditingProfile(false)}><Text style={styles.secondaryActionText}>Cancelar</Text></Pressable></> : <><Text style={styles.panelName}>{user.name}</Text><Text style={styles.panelMeta}>{user.profession || "Membro da comunidade"}{user.city ? ` · ${user.city}` : ""}</Text><Text style={styles.panelBio}>{user.bio || "Seu perfil está protegido. Compartilhe apenas o que fizer sentido para você."}</Text><Pressable onPress={startProfileEdit} style={({ pressed }) => [styles.secondaryAction, pressed && styles.pressed]}><Text style={styles.secondaryActionText}>Editar perfil</Text></Pressable><Pressable onPress={handleLogout} disabled={loading} style={({ pressed }) => [styles.button, pressed && styles.pressed]}><Text style={styles.buttonText}>{loading ? "Saindo…" : "Sair da conta"}</Text></Pressable></>}</View>
         ) : (
           <View style={styles.profilePanel}><View style={styles.largeAvatar}><Text style={styles.largeAvatarText}>HM</Text></View><Text style={styles.panelName}>Entre para participar</Text><Text style={styles.panelMeta}>Crie seu perfil e faça parte da rede.</Text><Text style={styles.panelBio}>{message}</Text><Pressable onPress={() => openAuth("login")} style={({ pressed }) => [styles.button, pressed && styles.pressed]}><Text style={styles.buttonText}>Entrar</Text></Pressable><Pressable onPress={() => openAuth("register")} style={({ pressed }) => [styles.secondaryAction, pressed && styles.pressed]}><Text style={styles.secondaryActionText}>Criar uma conta</Text></Pressable></View>
         )}
@@ -361,6 +390,7 @@ const styles = StyleSheet.create({
   searchCard: { marginTop: 28, padding: 16, backgroundColor: "#FFFDF9", borderRadius: 12, borderWidth: 1, borderColor: "#E5E7E2" },
   label: { color: "#17324D", fontSize: 10, fontWeight: "700", letterSpacing: 1.2, marginBottom: 9 },
   input: { height: 47, marginBottom: 9, paddingHorizontal: 13, borderWidth: 1, borderColor: "#DFE5E4", borderRadius: 7, color: "#17324D", fontSize: 14, backgroundColor: "#FFFFFF" },
+  bioInput: { height: 88, textAlignVertical: "top", paddingTop: 12 },
   button: { height: 47, marginTop: 2, alignItems: "center", justifyContent: "center", borderRadius: 7, backgroundColor: "#102A43" },
   buttonDisabled: { opacity: 0.55 },
   pressed: { transform: [{ scale: 0.98 }], opacity: 0.9 },

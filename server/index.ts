@@ -19,7 +19,7 @@ app.use((req, res, next) => {
   const origin = process.env.CORS_ORIGIN || "*";
   res.setHeader("Access-Control-Allow-Origin", origin);
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS");
   if (req.method === "OPTIONS") return res.status(204).end();
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
@@ -83,6 +83,7 @@ const loginSchema = z.object({ email: z.string().trim().email(), password: z.str
 const postSchema = z.object({ body: z.string().trim().min(1).max(1000) }).strict();
 const reportSchema = z.object({ targetType: z.enum(["user", "post"]), targetId: z.number().int().positive(), reason: z.string().trim().min(3).max(120), details: z.string().trim().max(500).optional() }).strict();
 const blockSchema = z.object({ userId: z.number().int().positive() }).strict();
+const profileSchema = z.object({ name: z.string().trim().min(2).max(80), city: z.string().trim().max(90), profession: z.string().trim().max(90), bio: z.string().trim().max(240) }).strict();
 
 app.get("/api/health", (_req, res) => res.json({ ok: true, service: "homonimos-api", database: databaseKind }));
 
@@ -119,6 +120,15 @@ app.post("/api/auth/logout", async (req, res) => {
 
 app.get("/api/auth/me", async (req, res) => {
   const user = await resolveUser(req);
+  return res.json({ user: user ? publicUser(user) : null });
+});
+
+app.patch("/api/auth/me", requireAuth, async (req: AuthRequest, res) => {
+  const parsed = profileSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "INVALID_INPUT", message: "Confira os campos do perfil." });
+  const data = parsed.data;
+  await execute("UPDATE users SET name = ?, city = ?, profession = ?, bio = ? WHERE id = ?", [data.name, data.city || null, data.profession || null, data.bio || null, req.user!.id]);
+  const user = await getUserById(req.user!.id);
   return res.json({ user: user ? publicUser(user) : null });
 });
 

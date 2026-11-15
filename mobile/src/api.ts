@@ -68,6 +68,11 @@ export class HomonimosApi {
     return this.request<{ user: User | null }>("/api/auth/me");
   }
 
+  async updateProfile(input: { name: string; city: string; profession: string; bio: string }) {
+    const result = await this.request<{ user: User }>("/api/auth/me", { method: "PATCH", body: JSON.stringify(input) });
+    return result.user;
+  }
+
   async logout() {
     await this.request<void>("/api/auth/logout", { method: "POST" });
     this.sessionToken = null;
