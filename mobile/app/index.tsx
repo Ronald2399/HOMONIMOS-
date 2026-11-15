@@ -385,6 +385,9 @@ export default function HomeScreen() {
   function renderCommunities() {
     return (
       <View>
+        <Pressable accessibilityRole="button" accessibilityLabel="Voltar para o início" onPress={() => setScreen("home")} style={({ pressed }) => [styles.backButton, styles.listBackButton, pressed && styles.pressed]}>
+          <Text style={styles.backIcon}>‹</Text><Text style={styles.backText}>Início</Text>
+        </Pressable>
         <Text style={styles.sectionTitle}>Comunidades</Text>
         <Text style={styles.sectionLead}>Espaços para conversar, trocar experiências e criar conexões reais.</Text>
         {communityLoading && communities.length === 0 ? <ActivityIndicator color="#102A43" style={styles.loader} /> : (
@@ -414,7 +417,7 @@ export default function HomeScreen() {
     if (!selectedCommunity) return null;
     return (
       <View>
-        <Pressable onPress={() => setScreen("communities")} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}><Text style={styles.backText}>← Comunidades</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Voltar para comunidades" onPress={() => setScreen("communities")} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}><Text style={styles.backIcon}>‹</Text><Text style={styles.backText}>Comunidades</Text></Pressable>
         <View style={styles.communityHero}><View style={styles.largeCommunityIcon}><Text style={styles.largeCommunityIconText}>{selectedCommunity.name.slice(0, 1).toUpperCase()}</Text></View><Text style={styles.sectionTitle}>{selectedCommunity.name}</Text><Text style={styles.sectionLead}>{selectedCommunity.memberCount.toLocaleString("pt-BR")} membros · um espaço para conexões reais.</Text></View>
         {message && <Text style={styles.message}>{message}</Text>}
         {user && selectedCommunity.joined ? <View style={styles.postComposer}><Text style={styles.label}>NOVA PUBLICAÇÃO</Text><TextInput value={postBody} onChangeText={setPostBody} placeholder="Compartilhe algo com a comunidade" placeholderTextColor="#8B999D" style={[styles.input, styles.postInput]} multiline maxLength={1000} /><Pressable disabled={postBody.trim().length < 1 || postLoading} onPress={createPost} style={({ pressed }) => [styles.button, (postBody.trim().length < 1 || postLoading) && styles.buttonDisabled, pressed && styles.pressed]}><Text style={styles.buttonText}>{postLoading ? "Publicando…" : "Publicar"}</Text></Pressable></View> : <View style={styles.joinPrompt}><Text style={styles.joinPromptTitle}>Participe da comunidade</Text><Text style={styles.joinPromptCopy}>Entre para publicar e conversar com outros membros.</Text><Pressable onPress={() => joinCommunity(selectedCommunity)} disabled={communityLoading || selectedCommunity.joined} style={({ pressed }) => [styles.button, pressed && styles.pressed]}><Text style={styles.buttonText}>{selectedCommunity.joined ? "Participando" : "Entrar na comunidade"}</Text></Pressable></View>}
@@ -427,7 +430,7 @@ export default function HomeScreen() {
   function renderSettings() {
     return (
       <View>
-        <Pressable onPress={() => setScreen("profile")} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}><Text style={styles.backText}>← Perfil</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Voltar para o perfil" onPress={() => setScreen("profile")} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}><Text style={styles.backIcon}>‹</Text><Text style={styles.backText}>Perfil</Text></Pressable>
         <Text style={styles.sectionTitle}>Configurações</Text>
         <Text style={styles.sectionLead}>Tudo o que você precisa para cuidar da sua conta e da sua privacidade.</Text>
         <Text style={styles.settingsSectionLabel}>CONTA</Text>
@@ -572,8 +575,10 @@ const styles = StyleSheet.create({
   joinedButton: { backgroundColor: "#E5F0ED" },
   joinedText: { color: "#2C695D" },
   emptyText: { marginTop: 24, color: "#53687A", fontSize: 13 },
-  backButton: { alignSelf: "flex-start", paddingVertical: 5, paddingHorizontal: 2, marginBottom: 16 },
-  backText: { color: "#D85F4A", fontSize: 12, fontWeight: "700" },
+  backButton: { minHeight: 48, minWidth: 132, flexDirection: "row", alignItems: "center", alignSelf: "flex-start", paddingVertical: 8, paddingHorizontal: 10, marginBottom: 12, borderRadius: 10 },
+  listBackButton: { marginTop: -8 },
+  backIcon: { marginRight: 5, color: "#D85F4A", fontSize: 31, lineHeight: 34, fontWeight: "400" },
+  backText: { color: "#D85F4A", fontSize: 15, fontWeight: "700" },
   communityHero: { alignItems: "center", paddingTop: 12, paddingBottom: 10 },
   largeCommunityIcon: { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center", backgroundColor: "#D7E8F4", marginBottom: 13 },
   largeCommunityIconText: { color: "#17324D", fontSize: 22, fontWeight: "700" },
