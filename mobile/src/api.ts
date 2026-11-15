@@ -4,6 +4,8 @@ export type User = {
   city: string | null;
   profession: string | null;
   bio: string | null;
+  notifyCommunities: boolean;
+  notifyReplies: boolean;
   createdAt: string;
 };
 
@@ -79,6 +81,10 @@ export class HomonimosApi {
   async updateProfile(input: { name: string; city: string; profession: string; bio: string }) {
     const result = await this.request<{ user: User }>("/api/auth/me", { method: "PATCH", body: JSON.stringify(input) });
     return result.user;
+  }
+
+  async updatePreferences(input: { notifyCommunities: boolean; notifyReplies: boolean }) {
+    return this.request<{ preferences: { notifyCommunities: boolean; notifyReplies: boolean } }>("/api/auth/preferences", { method: "PATCH", body: JSON.stringify(input) });
   }
 
   async logout() {

@@ -18,7 +18,7 @@ const sqlite = connectionString ? null : (() => {
 
 if (sqlite) {
   sqlite.exec(`
-    CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, city TEXT, profession TEXT, bio TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+    CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, city TEXT, profession TEXT, bio TEXT, notify_communities INTEGER NOT NULL DEFAULT 1, notify_replies INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
     CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires_at TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
     CREATE TABLE IF NOT EXISTS communities (id INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT NOT NULL UNIQUE, display_name TEXT NOT NULL, member_count INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
     CREATE TABLE IF NOT EXISTS memberships (user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, community_id INTEGER NOT NULL REFERENCES communities(id) ON DELETE CASCADE, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (user_id, community_id));
@@ -79,17 +79,19 @@ export type UserRow = {
   city: string | null;
   profession: string | null;
   bio: string | null;
+  notify_communities: boolean | number;
+  notify_replies: boolean | number;
   created_at: string;
 };
 
 export function publicUser(user: UserRow) {
-  return { id: user.id, name: user.name, city: user.city, profession: user.profession, bio: user.bio, createdAt: user.created_at };
+  return { id: user.id, name: user.name, city: user.city, profession: user.profession, bio: user.bio, notifyCommunities: user.notify_communities === undefined ? true : Boolean(user.notify_communities), notifyReplies: user.notify_replies === undefined ? true : Boolean(user.notify_replies), createdAt: user.created_at };
 }
 
 export async function getUserById(id: number) {
-  return queryOne<UserRow>("SELECT id, name, email, city, profession, bio, created_at FROM users WHERE id = ?", [id]);
+  return queryOne<UserRow>("SELECT id, name, email, city, profession, bio, notify_communities, notify_replies, created_at FROM users WHERE id = ?", [id]);
 }
 
 export async function getUserByEmail(email: string) {
-  return queryOne<UserRow & { password_hash: string }>("SELECT id, name, email, password_hash, city, profession, bio, created_at FROM users WHERE email = ?", [email]);
+  return queryOne<UserRow & { password_hash: string }>("SELECT id, name, email, password_hash, city, profession, bio, notify_communities, notify_replies, created_at FROM users WHERE email = ?", [email]);
 }

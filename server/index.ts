@@ -85,6 +85,7 @@ const commentSchema = z.object({ body: z.string().trim().min(1).max(500), parent
 const reportSchema = z.object({ targetType: z.enum(["user", "post"]), targetId: z.number().int().positive(), reason: z.string().trim().min(3).max(120), details: z.string().trim().max(500).optional() }).strict();
 const blockSchema = z.object({ userId: z.number().int().positive() }).strict();
 const profileSchema = z.object({ name: z.string().trim().min(2).max(80), city: z.string().trim().max(90), profession: z.string().trim().max(90), bio: z.string().trim().max(240) }).strict();
+const preferencesSchema = z.object({ notifyCommunities: z.boolean(), notifyReplies: z.boolean() }).strict();
 
 app.get("/api/health", (_req, res) => res.json({ ok: true, service: "homonimos-api", database: databaseKind }));
 
@@ -131,6 +132,14 @@ app.patch("/api/auth/me", requireAuth, async (req: AuthRequest, res) => {
   await execute("UPDATE users SET name = ?, city = ?, profession = ?, bio = ? WHERE id = ?", [data.name, data.city || null, data.profession || null, data.bio || null, req.user!.id]);
   const user = await getUserById(req.user!.id);
   return res.json({ user: user ? publicUser(user) : null });
+});
+
+app.patch("/api/auth/preferences", requireAuth, async (req: AuthRequest, res) => {
+  const parsed = preferencesSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "INVALID_INPUT", message: "Preferências inválidas." });
+  await execute("UPDATE users SET notify_communities = ?, notify_replies = ? WHERE id = ?", [parsed.data.notifyCommunities, parsed.data.notifyReplies, req.user!.id]);
+  const user = await getUserById(req.user!.id);
+  return res.json({ preferences: { notifyCommunities: user?.notify_communities === undefined ? true : Boolean(user.notify_communities), notifyReplies: user?.notify_replies === undefined ? true : Boolean(user.notify_replies) } });
 });
 
 app.get("/api/search", async (req, res) => {

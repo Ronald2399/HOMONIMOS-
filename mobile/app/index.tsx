@@ -111,6 +111,13 @@ export default function HomeScreen() {
     if (screen === "settings" && user) void loadBlockedUsers();
   }, [screen, user]);
 
+  useEffect(() => {
+    if (user) {
+      setNotifyCommunities(user.notifyCommunities);
+      setNotifyReplies(user.notifyReplies);
+    }
+  }, [user]);
+
   async function search() {
     if (!canSearch) return;
     setLoading(true);
@@ -162,6 +169,26 @@ export default function HomeScreen() {
 
   function showPlannedFeature(title: string) {
     Alert.alert(title, "Esta função será conectada com segurança na próxima etapa. O aplicativo continua funcionando normalmente.");
+  }
+
+  async function toggleNotificationPreference(kind: "communities" | "replies") {
+    if (!user || settingsLoading) return;
+    const nextCommunities = kind === "communities" ? !notifyCommunities : notifyCommunities;
+    const nextReplies = kind === "replies" ? !notifyReplies : notifyReplies;
+    setNotifyCommunities(nextCommunities);
+    setNotifyReplies(nextReplies);
+    setSettingsLoading(true);
+    try {
+      await api.updatePreferences({ notifyCommunities: nextCommunities, notifyReplies: nextReplies });
+      setUser((current) => current ? { ...current, notifyCommunities: nextCommunities, notifyReplies: nextReplies } : current);
+      setMessage("Preferência de notificações salva.");
+    } catch (error) {
+      setNotifyCommunities(user.notifyCommunities);
+      setNotifyReplies(user.notifyReplies);
+      setMessage(error instanceof Error ? error.message : "Não foi possível salvar a preferência.");
+    } finally {
+      setSettingsLoading(false);
+    }
   }
 
   async function submitAuth() {
@@ -509,8 +536,8 @@ export default function HomeScreen() {
         </View>
         <Text style={styles.settingsSectionLabel}>NOTIFICAÇÕES</Text>
         <View style={styles.settingsCard}>
-          <View style={styles.settingsRow}><View style={styles.settingsRowCopy}><Text style={styles.settingsRowTitle}>Atividade nas comunidades</Text><Text style={styles.settingsRowHint}>Novidades e avisos importantes</Text></View><Pressable onPress={() => setNotifyCommunities((current) => !current)} style={[styles.toggle, notifyCommunities && styles.toggleOn]}><View style={[styles.toggleKnob, notifyCommunities && styles.toggleKnobOn]} /></Pressable></View>
-          <View style={styles.settingsRow}><View style={styles.settingsRowCopy}><Text style={styles.settingsRowTitle}>Respostas e interações</Text><Text style={styles.settingsRowHint}>Quando alguém interagir com você</Text></View><Pressable onPress={() => setNotifyReplies((current) => !current)} style={[styles.toggle, notifyReplies && styles.toggleOn]}><View style={[styles.toggleKnob, notifyReplies && styles.toggleKnobOn]} /></Pressable></View>
+          <View style={styles.settingsRow}><View style={styles.settingsRowCopy}><Text style={styles.settingsRowTitle}>Atividade nas comunidades</Text><Text style={styles.settingsRowHint}>Novidades e avisos importantes</Text></View><Pressable accessibilityRole="switch" accessibilityState={{ checked: notifyCommunities }} onPress={() => void toggleNotificationPreference("communities")} disabled={settingsLoading} style={[styles.toggle, notifyCommunities && styles.toggleOn]}><View style={[styles.toggleKnob, notifyCommunities && styles.toggleKnobOn]} /></Pressable></View>
+          <View style={styles.settingsRow}><View style={styles.settingsRowCopy}><Text style={styles.settingsRowTitle}>Respostas e interações</Text><Text style={styles.settingsRowHint}>Quando alguém interagir com você</Text></View><Pressable accessibilityRole="switch" accessibilityState={{ checked: notifyReplies }} onPress={() => void toggleNotificationPreference("replies")} disabled={settingsLoading} style={[styles.toggle, notifyReplies && styles.toggleOn]}><View style={[styles.toggleKnob, notifyReplies && styles.toggleKnobOn]} /></Pressable></View>
         </View>
         <Text style={styles.settingsSectionLabel}>AJUDA</Text>
         <View style={styles.settingsCard}>
