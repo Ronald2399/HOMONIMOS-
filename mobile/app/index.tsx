@@ -67,6 +67,9 @@ export default function HomeScreen() {
   const [profileBio, setProfileBio] = useState("");
   const [blockedUsers, setBlockedUsers] = useState<User[]>([]);
   const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsPrivacyExpanded, setSettingsPrivacyExpanded] = useState(false);
+  const [notifyCommunities, setNotifyCommunities] = useState(true);
+  const [notifyReplies, setNotifyReplies] = useState(true);
 
   const canSearch = useMemo(() => query.trim().length >= 2 && !loading && !restoringSession, [query, loading, restoringSession]);
   const canSubmitAuth = authMode === "register"
@@ -148,6 +151,10 @@ export default function HomeScreen() {
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Não foi possível desbloquear este perfil.");
     }
+  }
+
+  function showPlannedFeature(title: string) {
+    Alert.alert(title, "Esta função será conectada com segurança na próxima etapa. O aplicativo continua funcionando normalmente.");
   }
 
   async function submitAuth() {
@@ -364,9 +371,31 @@ export default function HomeScreen() {
       <View>
         <Pressable onPress={() => setScreen("profile")} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}><Text style={styles.backText}>← Perfil</Text></Pressable>
         <Text style={styles.sectionTitle}>Configurações</Text>
-        <Text style={styles.sectionLead}>Controle sua privacidade e escolha como participar do Homônimos.</Text>
-        <View style={styles.settingsCard}><Text style={styles.settingsTitle}>Privacidade</Text><Text style={styles.settingsCopy}>Seus dados de perfil são usados apenas para apresentar sua identidade e facilitar conexões dentro do aplicativo.</Text><Text style={styles.settingsCopy}>O Homônimos não exibe CPF, documentos, processos ou informações sensíveis.</Text></View>
-        <View style={styles.settingsCard}><Text style={styles.settingsTitle}>Perfis bloqueados</Text><Text style={styles.settingsCopy}>Pessoas bloqueadas não aparecem nas suas buscas nem nas publicações das comunidades.</Text>{settingsLoading ? <ActivityIndicator color="#102A43" style={styles.loader} /> : blockedUsers.length === 0 ? <Text style={styles.emptyText}>Você ainda não bloqueou nenhum perfil.</Text> : <FlatList data={blockedUsers} scrollEnabled={false} keyExtractor={(item) => String(item.id)} contentContainerStyle={styles.listGap} renderItem={({ item }) => <View style={styles.blockedRow}><View style={styles.avatar}><Text style={styles.avatarText}>{item.name.slice(0, 2).toUpperCase()}</Text></View><View style={styles.blockedCopy}><Text style={styles.resultName}>{item.name}</Text><Text style={styles.resultMeta}>{item.profession || "Membro da comunidade"}</Text></View><Pressable onPress={() => unblockUser(item)} style={({ pressed }) => [styles.unblockButton, pressed && styles.pressed]}><Text style={styles.unblockText}>Desbloquear</Text></Pressable></View>} />}</View>
+        <Text style={styles.sectionLead}>Tudo o que você precisa para cuidar da sua conta e da sua privacidade.</Text>
+        <Text style={styles.settingsSectionLabel}>CONTA</Text>
+        <View style={styles.settingsCard}>
+          <Pressable onPress={() => setScreen("profile")} style={({ pressed }) => [styles.settingsRow, pressed && styles.pressed]}><View style={styles.settingsRowCopy}><Text style={styles.settingsRowTitle}>Editar perfil</Text><Text style={styles.settingsRowHint}>Nome, cidade, profissão e biografia</Text></View><Text style={styles.settingsChevron}>›</Text></Pressable>
+          <Pressable onPress={() => showPlannedFeature("Alterar senha")} style={({ pressed }) => [styles.settingsRow, pressed && styles.pressed]}><View style={styles.settingsRowCopy}><Text style={styles.settingsRowTitle}>Alterar senha</Text><Text style={styles.settingsRowHint}>Mantenha sua conta protegida</Text></View><Text style={styles.settingsChevron}>›</Text></Pressable>
+          <Pressable onPress={() => showPlannedFeature("Excluir conta")} style={({ pressed }) => [styles.settingsRow, styles.dangerRow, pressed && styles.pressed]}><View style={styles.settingsRowCopy}><Text style={styles.dangerText}>Excluir conta</Text><Text style={styles.settingsRowHint}>Esta ação será irreversível</Text></View><Text style={styles.settingsChevron}>›</Text></Pressable>
+        </View>
+        <Text style={styles.settingsSectionLabel}>PRIVACIDADE</Text>
+        <View style={styles.settingsCard}>
+          <View style={styles.settingsIntro}><Text style={styles.settingsTitle}>Sua identidade no controle</Text><Text style={styles.settingsCopy}>O Homônimos não exibe CPF, documentos, processos ou informações sensíveis.</Text></View>
+          <Pressable onPress={() => setSettingsPrivacyExpanded((current) => !current)} style={({ pressed }) => [styles.settingsRow, pressed && styles.pressed]}><View style={styles.settingsRowCopy}><Text style={styles.settingsRowTitle}>Como usamos seus dados</Text><Text style={styles.settingsRowHint}>{settingsPrivacyExpanded ? "Toque para ocultar" : "Toque para saber mais"}</Text></View><Text style={styles.settingsChevron}>{settingsPrivacyExpanded ? "⌃" : "⌄"}</Text></Pressable>
+          {settingsPrivacyExpanded && <Text style={styles.settingsExpandedCopy}>Usamos nome, cidade, profissão e biografia somente para exibir seu perfil e permitir conexões dentro da comunidade. Você pode editar essas informações quando quiser.</Text>}
+          <Text style={styles.settingsRowDivider} />
+          <Text style={styles.settingsTitle}>Perfis bloqueados</Text><Text style={styles.settingsCopy}>Pessoas bloqueadas não aparecem nas suas buscas nem nas publicações.</Text>{settingsLoading ? <ActivityIndicator color="#102A43" style={styles.loader} /> : blockedUsers.length === 0 ? <Text style={styles.emptyText}>Você ainda não bloqueou nenhum perfil.</Text> : <FlatList data={blockedUsers} scrollEnabled={false} keyExtractor={(item) => String(item.id)} contentContainerStyle={styles.listGap} renderItem={({ item }) => <View style={styles.blockedRow}><View style={styles.avatar}><Text style={styles.avatarText}>{item.name.slice(0, 2).toUpperCase()}</Text></View><View style={styles.blockedCopy}><Text style={styles.resultName}>{item.name}</Text><Text style={styles.resultMeta}>{item.profession || "Membro da comunidade"}</Text></View><Pressable onPress={() => unblockUser(item)} style={({ pressed }) => [styles.unblockButton, pressed && styles.pressed]}><Text style={styles.unblockText}>Desbloquear</Text></Pressable></View>} />}
+        </View>
+        <Text style={styles.settingsSectionLabel}>NOTIFICAÇÕES</Text>
+        <View style={styles.settingsCard}>
+          <View style={styles.settingsRow}><View style={styles.settingsRowCopy}><Text style={styles.settingsRowTitle}>Atividade nas comunidades</Text><Text style={styles.settingsRowHint}>Novidades e avisos importantes</Text></View><Pressable onPress={() => setNotifyCommunities((current) => !current)} style={[styles.toggle, notifyCommunities && styles.toggleOn]}><View style={[styles.toggleKnob, notifyCommunities && styles.toggleKnobOn]} /></Pressable></View>
+          <View style={styles.settingsRow}><View style={styles.settingsRowCopy}><Text style={styles.settingsRowTitle}>Respostas e interações</Text><Text style={styles.settingsRowHint}>Quando alguém interagir com você</Text></View><Pressable onPress={() => setNotifyReplies((current) => !current)} style={[styles.toggle, notifyReplies && styles.toggleOn]}><View style={[styles.toggleKnob, notifyReplies && styles.toggleKnobOn]} /></Pressable></View>
+        </View>
+        <Text style={styles.settingsSectionLabel}>AJUDA</Text>
+        <View style={styles.settingsCard}>
+          <Pressable onPress={() => showPlannedFeature("Termos de uso")} style={({ pressed }) => [styles.settingsRow, pressed && styles.pressed]}><View style={styles.settingsRowCopy}><Text style={styles.settingsRowTitle}>Termos de uso</Text><Text style={styles.settingsRowHint}>Leia as regras de convivência</Text></View><Text style={styles.settingsChevron}>›</Text></Pressable>
+          <Pressable onPress={() => showPlannedFeature("Falar com o suporte")} style={({ pressed }) => [styles.settingsRow, pressed && styles.pressed]}><View style={styles.settingsRowCopy}><Text style={styles.settingsRowTitle}>Falar com o suporte</Text><Text style={styles.settingsRowHint}>Ajuda para usar o aplicativo</Text></View><Text style={styles.settingsChevron}>›</Text></Pressable>
+        </View>
         {message && <Text style={styles.message}>{message}</Text>}
       </View>
     );
@@ -457,6 +486,21 @@ const styles = StyleSheet.create({
   safeCopy: { marginTop: 5, color: "#5E8682", fontSize: 11, lineHeight: 16 },
   sectionTitle: { color: "#102A43", fontSize: 30, fontWeight: "700", letterSpacing: -1 },
   sectionLead: { marginTop: 10, color: "#53687A", fontSize: 14, lineHeight: 21 },
+  settingsSectionLabel: { marginTop: 24, marginBottom: 8, color: "#8B999D", fontSize: 10, fontWeight: "700", letterSpacing: 1.5 },
+  settingsRow: { minHeight: 58, flexDirection: "row", alignItems: "center", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#EEF0ED" },
+  settingsRowCopy: { flex: 1 },
+  settingsRowTitle: { color: "#17324D", fontSize: 13, fontWeight: "700" },
+  settingsRowHint: { marginTop: 3, color: "#89979A", fontSize: 10 },
+  settingsChevron: { marginLeft: 12, color: "#D85F4A", fontSize: 23, fontWeight: "300" },
+  settingsIntro: { paddingBottom: 8 },
+  settingsExpandedCopy: { paddingTop: 8, paddingBottom: 12, color: "#53687A", fontSize: 11, lineHeight: 17 },
+  settingsRowDivider: { height: 1, marginVertical: 14, backgroundColor: "#EEF0ED" },
+  dangerRow: { borderBottomWidth: 0 },
+  dangerText: { color: "#D85F4A", fontSize: 13, fontWeight: "700" },
+  toggle: { width: 43, height: 25, padding: 3, justifyContent: "center", borderRadius: 14, backgroundColor: "#D9DEDC" },
+  toggleOn: { backgroundColor: "#2C695D" },
+  toggleKnob: { width: 19, height: 19, borderRadius: 10, backgroundColor: "#FFFFFF" },
+  toggleKnobOn: { alignSelf: "flex-end" },
   loader: { marginTop: 32 },
   communityCard: { flexDirection: "row", alignItems: "center", padding: 14, backgroundColor: "#FFFDF9", borderRadius: 10, borderWidth: 1, borderColor: "#E7E9E5" },
   communityInfoPressable: { flex: 1, flexDirection: "row", alignItems: "center" },
@@ -489,12 +533,13 @@ const styles = StyleSheet.create({
   postDate: { marginTop: 11, color: "#A0AAAC", fontSize: 10 },
   safetyActions: { flexDirection: "row", gap: 18, marginTop: 13, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#EEF0ED" },
   safetyActionText: { color: "#D85F4A", fontSize: 10, fontWeight: "700" },
-  profilePanel: { marginTop: 22, padding: 20, alignItems: "center", backgroundColor: "#FFFDF9", borderRadius: 12, borderWidth: 1, borderColor: "#E5E7E2" },
+  profilePanel: { marginTop: 22, padding: 24, alignItems: "center", backgroundColor: "#FFFDF9", borderRadius: 16, borderWidth: 1, borderColor: "#E5E7E2", shadowColor: "#17324D", shadowOpacity: 0.05, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2 },
+  profileIdentity: { alignItems: "center", marginBottom: 2 },
   largeAvatar: { width: 76, height: 76, borderRadius: 38, alignItems: "center", justifyContent: "center", backgroundColor: "#D7E8F4" },
   largeAvatarText: { color: "#17324D", fontSize: 20, fontWeight: "700" },
   panelName: { marginTop: 14, color: "#102A43", fontSize: 19, fontWeight: "700", textAlign: "center" },
   panelMeta: { marginTop: 5, color: "#53687A", fontSize: 12, textAlign: "center" },
-  panelBio: { marginTop: 16, marginBottom: 18, color: "#89979A", fontSize: 12, lineHeight: 18, textAlign: "center" },
+  panelBio: { maxWidth: 300, marginTop: 16, marginBottom: 18, color: "#6F7E82", fontSize: 13, lineHeight: 20, textAlign: "center" },
   secondaryAction: { marginTop: 14, paddingVertical: 12 },
   secondaryActionText: { color: "#D85F4A", fontSize: 12, fontWeight: "700" },
   settingsLink: { marginTop: 20, alignItems: "center", paddingVertical: 10 },
