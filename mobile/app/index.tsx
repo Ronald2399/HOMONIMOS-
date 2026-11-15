@@ -246,7 +246,6 @@ export default function HomeScreen() {
       <View>
         <Text style={styles.sectionTitle}>Comunidades</Text>
         <Text style={styles.sectionLead}>Espaços para conversar, trocar experiências e criar conexões reais.</Text>
-        {message && <Text style={styles.message}>{message}</Text>}
         {communityLoading && communities.length === 0 ? <ActivityIndicator color="#102A43" style={styles.loader} /> : (
           <FlatList data={communities} scrollEnabled={false} keyExtractor={(item) => String(item.id)} contentContainerStyle={styles.listGap} renderItem={({ item }) => (
             <View style={styles.communityCard}><Pressable onPress={() => openCommunity(item)} style={({ pressed }) => [styles.communityInfoPressable, pressed && styles.pressed]}><View style={styles.communityIcon}><Text style={styles.communityIconText}>{item.name.slice(0, 1).toUpperCase()}</Text></View><View style={styles.communityCopy}><Text style={styles.communityName}>{item.name}</Text><Text style={styles.communityMembers}>{item.memberCount.toLocaleString("pt-BR")} membros</Text></View></Pressable><Pressable onPress={() => joinCommunity(item)} disabled={communityLoading || item.joined} style={({ pressed }) => [styles.joinButton, item.joined && styles.joinedButton, pressed && styles.pressed]}><Text style={[styles.joinText, item.joined && styles.joinedText]}>{item.joined ? "Participando" : "Entrar"}</Text></Pressable></View>
