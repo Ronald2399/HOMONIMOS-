@@ -191,6 +191,24 @@ app.post("/api/communities/:slug/posts", requireAuth, async (req: AuthRequest, r
   return res.status(201).json({ id: result?.id, body: parsed.data.body });
 });
 
+app.patch("/api/posts/:postId", requireAuth, async (req: AuthRequest, res) => {
+  const parsed = postSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "INVALID_INPUT", message: "A publicação deve ter entre 1 e 1000 caracteres." });
+  const post = await queryOne<{ id: number; user_id: number }>("SELECT id, user_id FROM posts WHERE id = ?", [Number(req.params.postId)]);
+  if (!post) return res.status(404).json({ error: "NOT_FOUND", message: "Publicação não encontrada." });
+  if (Number(post.user_id) !== req.user!.id) return res.status(403).json({ error: "FORBIDDEN", message: "Você só pode editar suas próprias publicações." });
+  await execute("UPDATE posts SET body = ? WHERE id = ?", [parsed.data.body, post.id]);
+  return res.json({ id: post.id, body: parsed.data.body });
+});
+
+app.delete("/api/posts/:postId", requireAuth, async (req: AuthRequest, res) => {
+  const post = await queryOne<{ id: number; user_id: number }>("SELECT id, user_id FROM posts WHERE id = ?", [Number(req.params.postId)]);
+  if (!post) return res.status(404).json({ error: "NOT_FOUND", message: "Publicação não encontrada." });
+  if (Number(post.user_id) !== req.user!.id) return res.status(403).json({ error: "FORBIDDEN", message: "Você só pode excluir suas próprias publicações." });
+  await execute("DELETE FROM posts WHERE id = ?", [post.id]);
+  return res.status(204).send();
+});
+
 app.post("/api/reports", requireAuth, async (req: AuthRequest, res) => {
   const parsed = reportSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "INVALID_INPUT", message: "Informe o conteúdo e o motivo da denúncia." });

@@ -60,6 +60,8 @@ export default function HomeScreen() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [postBody, setPostBody] = useState("");
   const [postLoading, setPostLoading] = useState(false);
+  const [editingPostId, setEditingPostId] = useState<number | null>(null);
+  const [editingPostBody, setEditingPostBody] = useState("");
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileName, setProfileName] = useState("");
   const [profileCity, setProfileCity] = useState("");
@@ -242,6 +244,49 @@ export default function HomeScreen() {
     }
   }
 
+  function startPostEdit(post: Post) {
+    setEditingPostId(post.id);
+    setEditingPostBody(post.body);
+  }
+
+  function cancelPostEdit() {
+    setEditingPostId(null);
+    setEditingPostBody("");
+  }
+
+  async function savePostEdit() {
+    if (editingPostId === null || editingPostBody.trim().length < 1 || postLoading) return;
+    setPostLoading(true);
+    try {
+      const updated = await api.updatePost(editingPostId, editingPostBody.trim());
+      setPosts((current) => current.map((post) => post.id === editingPostId ? { ...post, body: updated.body } : post));
+      cancelPostEdit();
+      setMessage("Publicação atualizada com sucesso.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Não foi possível editar a publicação.");
+    } finally {
+      setPostLoading(false);
+    }
+  }
+
+  function deletePost(post: Post) {
+    Alert.alert("Excluir publicação", "Esta ação não poderá ser desfeita. Deseja realmente excluir sua publicação?", [
+      { text: "Cancelar", style: "cancel" },
+      { text: "Excluir", style: "destructive", onPress: async () => {
+        setPostLoading(true);
+        try {
+          await api.deletePost(post.id);
+          setPosts((current) => current.filter((item) => item.id !== post.id));
+          setMessage("Publicação excluída com sucesso.");
+        } catch (error) {
+          setMessage(error instanceof Error ? error.message : "Não foi possível excluir a publicação.");
+        } finally {
+          setPostLoading(false);
+        }
+      } },
+    ]);
+  }
+
   function reportPost(post: Post) {
     Alert.alert("Denunciar publicação", "A denúncia será analisada pela equipe do Homônimos.", [
       { text: "Cancelar", style: "cancel" },
@@ -352,6 +397,19 @@ export default function HomeScreen() {
     );
   }
 
+  function renderPostCard(post: Post) {
+    const isOwnPost = Boolean(user && post.author.id === user.id);
+    const isEditing = editingPostId === post.id;
+    return (
+      <View style={styles.postCard}>
+        <View style={styles.postHeader}><View style={styles.avatar}><Text style={styles.avatarText}>{post.author.name.slice(0, 2).toUpperCase()}</Text></View><View style={styles.postAuthorCopy}><Text style={styles.postAuthor}>{post.author.name}</Text><Text style={styles.postMeta}>{post.author.profession || "Membro"}</Text></View></View>
+        {isEditing ? <View style={styles.editPostBox}><TextInput value={editingPostBody} onChangeText={setEditingPostBody} style={[styles.input, styles.editPostInput]} multiline maxLength={1000} autoFocus /><View style={styles.editPostActions}><Pressable onPress={cancelPostEdit} disabled={postLoading}><Text style={styles.cancelPostText}>Cancelar</Text></Pressable><Pressable onPress={savePostEdit} disabled={editingPostBody.trim().length < 1 || postLoading} style={[styles.savePostButton, (editingPostBody.trim().length < 1 || postLoading) && styles.buttonDisabled]}><Text style={styles.savePostText}>{postLoading ? "Salvando…" : "Salvar"}</Text></Pressable></View></View> : <Text style={styles.postBody}>{post.body}</Text>}
+        <Text style={styles.postDate}>{new Date(post.createdAt).toLocaleDateString("pt-BR")}</Text>
+        {user && <View style={styles.safetyActions}>{isOwnPost ? <><Pressable onPress={() => startPostEdit(post)} disabled={postLoading || isEditing}><Text style={styles.safetyActionText}>Editar</Text></Pressable><Pressable onPress={() => deletePost(post)} disabled={postLoading || isEditing}><Text style={styles.safetyActionText}>Excluir</Text></Pressable></> : <><Pressable onPress={() => reportPost(post)}><Text style={styles.safetyActionText}>Denunciar</Text></Pressable><Pressable onPress={() => blockAuthor(post)}><Text style={styles.safetyActionText}>Bloquear autor</Text></Pressable></>}</View>}
+      </View>
+    );
+  }
+
   function renderCommunityDetail() {
     if (!selectedCommunity) return null;
     return (
@@ -361,7 +419,7 @@ export default function HomeScreen() {
         {message && <Text style={styles.message}>{message}</Text>}
         {user && selectedCommunity.joined ? <View style={styles.postComposer}><Text style={styles.label}>NOVA PUBLICAÇÃO</Text><TextInput value={postBody} onChangeText={setPostBody} placeholder="Compartilhe algo com a comunidade" placeholderTextColor="#8B999D" style={[styles.input, styles.postInput]} multiline maxLength={1000} /><Pressable disabled={postBody.trim().length < 1 || postLoading} onPress={createPost} style={({ pressed }) => [styles.button, (postBody.trim().length < 1 || postLoading) && styles.buttonDisabled, pressed && styles.pressed]}><Text style={styles.buttonText}>{postLoading ? "Publicando…" : "Publicar"}</Text></Pressable></View> : <View style={styles.joinPrompt}><Text style={styles.joinPromptTitle}>Participe da comunidade</Text><Text style={styles.joinPromptCopy}>Entre para publicar e conversar com outros membros.</Text><Pressable onPress={() => joinCommunity(selectedCommunity)} disabled={communityLoading || selectedCommunity.joined} style={({ pressed }) => [styles.button, pressed && styles.pressed]}><Text style={styles.buttonText}>{selectedCommunity.joined ? "Participando" : "Entrar na comunidade"}</Text></Pressable></View>}
         <Text style={styles.postsTitle}>Publicações recentes</Text>
-        {postLoading && posts.length === 0 ? <ActivityIndicator color="#102A43" style={styles.loader} /> : <FlatList data={posts} scrollEnabled={false} keyExtractor={(item) => String(item.id)} contentContainerStyle={styles.listGap} renderItem={({ item }) => <View style={styles.postCard}><View style={styles.postHeader}><View style={styles.avatar}><Text style={styles.avatarText}>{item.author.name.slice(0, 2).toUpperCase()}</Text></View><View><Text style={styles.postAuthor}>{item.author.name}</Text><Text style={styles.postMeta}>{item.author.profession || "Membro"}</Text></View></View><Text style={styles.postBody}>{item.body}</Text><Text style={styles.postDate}>{new Date(item.createdAt).toLocaleDateString("pt-BR")}</Text>{user && <View style={styles.safetyActions}><Pressable onPress={() => reportPost(item)}><Text style={styles.safetyActionText}>Denunciar</Text></Pressable>{item.author.id !== user.id && <Pressable onPress={() => blockAuthor(item)}><Text style={styles.safetyActionText}>Bloquear autor</Text></Pressable>}</View>}</View>} ListEmptyComponent={<Text style={styles.emptyText}>Ainda não há publicações. Seja o primeiro a compartilhar algo.</Text>} />}
+        {postLoading && posts.length === 0 ? <ActivityIndicator color="#102A43" style={styles.loader} /> : <FlatList data={posts} scrollEnabled={false} keyExtractor={(item) => String(item.id)} contentContainerStyle={styles.listGap} renderItem={({ item }) => renderPostCard(item)} ListEmptyComponent={<Text style={styles.emptyText}>Ainda não há publicações. Seja o primeiro a compartilhar algo.</Text>} />}
       </View>
     );
   }
@@ -516,7 +574,7 @@ const styles = StyleSheet.create({
   emptyText: { marginTop: 24, color: "#53687A", fontSize: 13 },
   backButton: { alignSelf: "flex-start", paddingVertical: 5, paddingHorizontal: 2, marginBottom: 16 },
   backText: { color: "#D85F4A", fontSize: 12, fontWeight: "700" },
-  communityHero: { alignItems: "center", paddingVertical: 4 },
+  communityHero: { alignItems: "center", paddingTop: 12, paddingBottom: 10 },
   largeCommunityIcon: { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center", backgroundColor: "#D7E8F4", marginBottom: 13 },
   largeCommunityIconText: { color: "#17324D", fontSize: 22, fontWeight: "700" },
   postComposer: { marginTop: 22, padding: 16, backgroundColor: "#FFFDF9", borderRadius: 12, borderWidth: 1, borderColor: "#E5E7E2" },
@@ -527,10 +585,17 @@ const styles = StyleSheet.create({
   postsTitle: { marginTop: 28, color: "#102A43", fontSize: 16, fontWeight: "700" },
   postCard: { padding: 15, backgroundColor: "#FFFDF9", borderRadius: 10, borderWidth: 1, borderColor: "#E7E9E5" },
   postHeader: { flexDirection: "row", alignItems: "center" },
+  postAuthorCopy: { flex: 1, minWidth: 0, marginLeft: 10 },
   postAuthor: { color: "#102A43", fontSize: 13, fontWeight: "700" },
   postMeta: { marginTop: 3, color: "#89979A", fontSize: 10 },
   postBody: { marginTop: 13, color: "#53687A", fontSize: 13, lineHeight: 20 },
   postDate: { marginTop: 11, color: "#A0AAAC", fontSize: 10 },
+  editPostBox: { marginTop: 13 },
+  editPostInput: { height: 100, marginBottom: 8, paddingTop: 12, textAlignVertical: "top" },
+  editPostActions: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 16 },
+  cancelPostText: { color: "#D85F4A", fontSize: 11, fontWeight: "700" },
+  savePostButton: { paddingVertical: 9, paddingHorizontal: 14, borderRadius: 7, backgroundColor: "#102A43" },
+  savePostText: { color: "#FFFFFF", fontSize: 11, fontWeight: "700" },
   safetyActions: { flexDirection: "row", gap: 18, marginTop: 13, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#EEF0ED" },
   safetyActionText: { color: "#D85F4A", fontSize: 10, fontWeight: "700" },
   profilePanel: { marginTop: 22, padding: 24, alignItems: "center", backgroundColor: "#FFFDF9", borderRadius: 16, borderWidth: 1, borderColor: "#E5E7E2", shadowColor: "#17324D", shadowOpacity: 0.05, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2 },

@@ -102,6 +102,14 @@ export class HomonimosApi {
     return this.request<{ id: number; body: string }>(`/api/communities/${encodeURIComponent(slug)}/posts`, { method: "POST", body: JSON.stringify({ body }) });
   }
 
+  async updatePost(postId: number, body: string) {
+    return this.request<{ id: number; body: string }>(`/api/posts/${postId}`, { method: "PATCH", body: JSON.stringify({ body }) });
+  }
+
+  async deletePost(postId: number) {
+    return this.request<void>(`/api/posts/${postId}`, { method: "DELETE" });
+  }
+
   async report(targetType: "user" | "post", targetId: number, reason: string, details?: string) {
     return this.request<{ reported: boolean }>("/api/reports", { method: "POST", body: JSON.stringify({ targetType, targetId, reason, details }) });
   }
