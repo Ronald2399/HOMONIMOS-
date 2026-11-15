@@ -208,6 +208,11 @@ app.post("/api/blocks", requireAuth, async (req: AuthRequest, res) => {
   return res.json({ blocked: true });
 });
 
+app.get("/api/blocks", requireAuth, async (req: AuthRequest, res) => {
+  const rows = await queryMany<UserRow>("SELECT u.id, u.name, u.email, u.city, u.profession, u.bio, u.created_at FROM users u JOIN blocks b ON b.blocked_id = u.id WHERE b.blocker_id = ? ORDER BY u.name ASC", [req.user!.id]);
+  return res.json({ users: rows.map(publicUser) });
+});
+
 app.delete("/api/blocks/:userId", requireAuth, async (req: AuthRequest, res) => {
   await execute("DELETE FROM blocks WHERE blocker_id = ? AND blocked_id = ?", [req.user!.id, Number(req.params.userId)]);
   return res.status(204).send();

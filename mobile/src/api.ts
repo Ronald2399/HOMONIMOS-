@@ -109,4 +109,12 @@ export class HomonimosApi {
   async block(userId: number) {
     return this.request<{ blocked: boolean }>("/api/blocks", { method: "POST", body: JSON.stringify({ userId }) });
   }
+
+  async listBlocked() {
+    return this.request<{ users: User[] }>("/api/blocks");
+  }
+
+  async unblock(userId: number) {
+    return this.request<void>(`/api/blocks/${userId}`, { method: "DELETE" });
+  }
 }

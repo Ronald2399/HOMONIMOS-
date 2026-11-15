@@ -16,7 +16,7 @@ import { loadSessionToken } from "../src/session";
 
 const api = new HomonimosApi(API_URL);
 type AuthMode = "login" | "register";
-type Screen = "home" | "communities" | "community" | "profile";
+type Screen = "home" | "communities" | "community" | "profile" | "settings";
 
 function Brand() {
   return (
@@ -65,6 +65,8 @@ export default function HomeScreen() {
   const [profileCity, setProfileCity] = useState("");
   const [profileProfession, setProfileProfession] = useState("");
   const [profileBio, setProfileBio] = useState("");
+  const [blockedUsers, setBlockedUsers] = useState<User[]>([]);
+  const [settingsLoading, setSettingsLoading] = useState(false);
 
   const canSearch = useMemo(() => query.trim().length >= 2 && !loading && !restoringSession, [query, loading, restoringSession]);
   const canSubmitAuth = authMode === "register"
@@ -95,6 +97,10 @@ export default function HomeScreen() {
     if (screen === "communities" && communities.length === 0) void loadCommunities();
   }, [screen]);
 
+  useEffect(() => {
+    if (screen === "settings" && user) void loadBlockedUsers();
+  }, [screen, user]);
+
   async function search() {
     if (!canSearch) return;
     setLoading(true);
@@ -119,6 +125,28 @@ export default function HomeScreen() {
       setMessage(error instanceof Error ? error.message : "Não foi possível carregar as comunidades.");
     } finally {
       setCommunityLoading(false);
+    }
+  }
+
+  async function loadBlockedUsers() {
+    setSettingsLoading(true);
+    try {
+      const response = await api.listBlocked();
+      setBlockedUsers(response.users);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Não foi possível carregar os bloqueios.");
+    } finally {
+      setSettingsLoading(false);
+    }
+  }
+
+  async function unblockUser(blockedUser: User) {
+    try {
+      await api.unblock(blockedUser.id);
+      setBlockedUsers((current) => current.filter((item) => item.id !== blockedUser.id));
+      setMessage(`${blockedUser.name} foi desbloqueado.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Não foi possível desbloquear este perfil.");
     }
   }
 
@@ -331,6 +359,19 @@ export default function HomeScreen() {
     );
   }
 
+  function renderSettings() {
+    return (
+      <View>
+        <Pressable onPress={() => setScreen("profile")} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}><Text style={styles.backText}>← Perfil</Text></Pressable>
+        <Text style={styles.sectionTitle}>Configurações</Text>
+        <Text style={styles.sectionLead}>Controle sua privacidade e escolha como participar do Homônimos.</Text>
+        <View style={styles.settingsCard}><Text style={styles.settingsTitle}>Privacidade</Text><Text style={styles.settingsCopy}>Seus dados de perfil são usados apenas para apresentar sua identidade e facilitar conexões dentro do aplicativo.</Text><Text style={styles.settingsCopy}>O Homônimos não exibe CPF, documentos, processos ou informações sensíveis.</Text></View>
+        <View style={styles.settingsCard}><Text style={styles.settingsTitle}>Perfis bloqueados</Text><Text style={styles.settingsCopy}>Pessoas bloqueadas não aparecem nas suas buscas nem nas publicações das comunidades.</Text>{settingsLoading ? <ActivityIndicator color="#102A43" style={styles.loader} /> : blockedUsers.length === 0 ? <Text style={styles.emptyText}>Você ainda não bloqueou nenhum perfil.</Text> : <FlatList data={blockedUsers} scrollEnabled={false} keyExtractor={(item) => String(item.id)} contentContainerStyle={styles.listGap} renderItem={({ item }) => <View style={styles.blockedRow}><View style={styles.avatar}><Text style={styles.avatarText}>{item.name.slice(0, 2).toUpperCase()}</Text></View><View style={styles.blockedCopy}><Text style={styles.resultName}>{item.name}</Text><Text style={styles.resultMeta}>{item.profession || "Membro da comunidade"}</Text></View><Pressable onPress={() => unblockUser(item)} style={({ pressed }) => [styles.unblockButton, pressed && styles.pressed]}><Text style={styles.unblockText}>Desbloquear</Text></Pressable></View>} />}</View>
+        {message && <Text style={styles.message}>{message}</Text>}
+      </View>
+    );
+  }
+
   function renderProfile() {
     return (
       <View>
@@ -340,6 +381,7 @@ export default function HomeScreen() {
         ) : (
           <View style={styles.profilePanel}><View style={styles.largeAvatar}><Text style={styles.largeAvatarText}>HM</Text></View><Text style={styles.panelName}>Entre para participar</Text><Text style={styles.panelMeta}>Crie seu perfil e faça parte da rede.</Text><Text style={styles.panelBio}>{message}</Text><Pressable onPress={() => openAuth("login")} style={({ pressed }) => [styles.button, pressed && styles.pressed]}><Text style={styles.buttonText}>Entrar</Text></Pressable><Pressable onPress={() => openAuth("register")} style={({ pressed }) => [styles.secondaryAction, pressed && styles.pressed]}><Text style={styles.secondaryActionText}>Criar uma conta</Text></Pressable></View>
         )}
+        {user && !authOpen && <Pressable onPress={() => setScreen("settings")} style={({ pressed }) => [styles.settingsLink, pressed && styles.pressed]}><Text style={styles.settingsLinkText}>Configurações e privacidade</Text></Pressable>}
         {authOpen && <View style={styles.authCard}><View style={styles.authHeader}><Text style={styles.authTitle}>{authMode === "login" ? "Entrar no Homônimos" : "Criar sua conta"}</Text><Pressable onPress={() => setAuthOpen(false)}><Text style={styles.closeText}>Fechar</Text></Pressable></View>{authMode === "register" && <TextInput value={name} onChangeText={setName} placeholder="Nome completo" placeholderTextColor="#8B999D" style={styles.input} autoCapitalize="words" />}<TextInput value={email} onChangeText={setEmail} placeholder="E-mail" placeholderTextColor="#8B999D" style={styles.input} keyboardType="email-address" autoCapitalize="none" /><TextInput value={password} onChangeText={setPassword} placeholder="Senha (mínimo de 8 caracteres)" placeholderTextColor="#8B999D" style={styles.input} secureTextEntry returnKeyType="done" />{authMode === "register" && <><TextInput value={city} onChangeText={setCity} placeholder="Cidade (opcional)" placeholderTextColor="#8B999D" style={styles.input} /><TextInput value={profession} onChangeText={setProfession} placeholder="Profissão (opcional)" placeholderTextColor="#8B999D" style={styles.input} /></>}<Pressable disabled={!canSubmitAuth} onPress={submitAuth} style={({ pressed }) => [styles.button, !canSubmitAuth && styles.buttonDisabled, pressed && styles.pressed]}><Text style={styles.buttonText}>{loading ? "Aguarde…" : authMode === "login" ? "Entrar" : "Criar conta"}</Text></Pressable><Pressable onPress={() => setAuthMode(authMode === "login" ? "register" : "login")}><Text style={styles.switchText}>{authMode === "login" ? "Ainda não tenho conta" : "Já tenho uma conta"}</Text></Pressable></View>}
       </View>
     );
@@ -347,7 +389,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.container}><FlatList data={[screen]} keyExtractor={(item) => item} renderItem={() => <View style={styles.content}><Brand />{screen === "home" ? renderHome() : screen === "communities" ? renderCommunities() : screen === "community" ? renderCommunityDetail() : renderProfile()}</View>} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" />
+      <View style={styles.container}><FlatList data={[screen]} keyExtractor={(item) => item} renderItem={() => <View style={styles.content}><Brand />{screen === "home" ? renderHome() : screen === "communities" ? renderCommunities() : screen === "community" ? renderCommunityDetail() : screen === "settings" ? renderSettings() : renderProfile()}</View>} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" />
         {screen !== "community" && <BottomNav screen={screen} onChange={setScreen} />}
       </View>
     </SafeAreaView>
@@ -455,6 +497,15 @@ const styles = StyleSheet.create({
   panelBio: { marginTop: 16, marginBottom: 18, color: "#89979A", fontSize: 12, lineHeight: 18, textAlign: "center" },
   secondaryAction: { marginTop: 14, paddingVertical: 12 },
   secondaryActionText: { color: "#D85F4A", fontSize: 12, fontWeight: "700" },
+  settingsLink: { marginTop: 20, alignItems: "center", paddingVertical: 10 },
+  settingsLinkText: { color: "#53687A", fontSize: 12, fontWeight: "700" },
+  settingsCard: { marginTop: 20, padding: 16, backgroundColor: "#FFFDF9", borderRadius: 12, borderWidth: 1, borderColor: "#E5E7E2" },
+  settingsTitle: { color: "#102A43", fontSize: 15, fontWeight: "700" },
+  settingsCopy: { marginTop: 8, color: "#53687A", fontSize: 12, lineHeight: 18 },
+  blockedRow: { flexDirection: "row", alignItems: "center", paddingVertical: 10, borderTopWidth: 1, borderTopColor: "#EEF0ED" },
+  blockedCopy: { flex: 1, marginLeft: 10 },
+  unblockButton: { paddingVertical: 8, paddingHorizontal: 9, borderRadius: 7, backgroundColor: "#E5F0ED" },
+  unblockText: { color: "#2C695D", fontSize: 10, fontWeight: "700" },
   bottomNav: { position: "absolute", bottom: 0, left: 0, right: 0, flexDirection: "row", justifyContent: "space-around", paddingTop: 10, paddingBottom: 12, backgroundColor: "#FFFDF9", borderTopWidth: 1, borderTopColor: "#E5E7E2" },
   navItem: { minWidth: 92, alignItems: "center", paddingVertical: 7, borderRadius: 8 },
   navItemActive: { backgroundColor: "#E5F0ED" },
