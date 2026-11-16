@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { API_URL, HomonimosApi, type Comment, type Community, type Post, type User } from "../src/api";
 import { persistApiSession, signOut } from "../src/auth";
-import { loadSessionToken } from "../src/session";
+import { clearSessionToken, loadSessionToken } from "../src/session";
 
 const api = new HomonimosApi(API_URL);
 type AuthMode = "login" | "register";
@@ -81,6 +81,9 @@ export default function HomeScreen() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
 
   const canSearch = useMemo(() => query.trim().length >= 2 && !loading && !restoringSession, [query, loading, restoringSession]);
   const canSubmitAuth = authMode === "register"
@@ -208,6 +211,26 @@ export default function HomeScreen() {
       setMessage("Senha alterada com sucesso.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Não foi possível alterar a senha.");
+    } finally {
+      setSettingsLoading(false);
+    }
+  }
+
+  async function submitAccountDeletion() {
+    if (!deletePassword || deleteConfirmation !== "EXCLUIR" || settingsLoading) return;
+    setSettingsLoading(true);
+    setMessage("");
+    try {
+      await api.deleteAccount(deletePassword, deleteConfirmation);
+      await clearSessionToken();
+      setDeletePassword("");
+      setDeleteConfirmation("");
+      setDeleteAccountOpen(false);
+      setUser(null);
+      setScreen("home");
+      setMessage("Sua conta foi excluída com sucesso.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Não foi possível excluir a conta.");
     } finally {
       setSettingsLoading(false);
     }
@@ -539,7 +562,20 @@ export default function HomeScreen() {
   function renderSettings() {
     return (
       <View>
-        {changePasswordOpen ? <>
+        {deleteAccountOpen ? <>
+        <Pressable accessibilityRole="button" accessibilityLabel="Voltar para configurações" onPress={() => setDeleteAccountOpen(false)} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}><Text style={styles.backIcon}>‹</Text><Text style={styles.backText}>Configurações</Text></Pressable>
+        <Text style={styles.sectionTitle}>Excluir conta</Text>
+        <Text style={styles.sectionLead}>Esta ação é permanente e não poderá ser desfeita.</Text>
+        <View style={styles.dangerPanel}>
+          <Text style={styles.dangerPanelTitle}>Antes de continuar</Text>
+          <Text style={styles.dangerPanelCopy}>Sua conta, publicações, comentários, comunidades e sessões serão removidos. Digite sua senha e escreva EXCLUIR para confirmar.</Text>
+          <TextInput value={deletePassword} onChangeText={setDeletePassword} placeholder="Sua senha atual" placeholderTextColor="#8B999D" style={styles.input} secureTextEntry />
+          <TextInput value={deleteConfirmation} onChangeText={setDeleteConfirmation} placeholder="Digite EXCLUIR" placeholderTextColor="#8B999D" style={styles.input} autoCapitalize="characters" />
+          <Pressable onPress={() => void submitAccountDeletion()} disabled={!deletePassword || deleteConfirmation !== "EXCLUIR" || settingsLoading} style={({ pressed }) => [styles.dangerButton, (!deletePassword || deleteConfirmation !== "EXCLUIR" || settingsLoading) && styles.buttonDisabled, pressed && styles.pressed]}><Text style={styles.buttonText}>{settingsLoading ? "Excluindo…" : "Excluir permanentemente"}</Text></Pressable>
+          <Pressable onPress={() => setDeleteAccountOpen(false)} style={({ pressed }) => [styles.cancelEditButton, pressed && styles.pressed]}><Text style={styles.cancelEditText}>Cancelar</Text></Pressable>
+        </View>
+        {message && <Text style={styles.message}>{message}</Text>}
+        </> : changePasswordOpen ? <>
         <Pressable accessibilityRole="button" accessibilityLabel="Voltar para configurações" onPress={() => setChangePasswordOpen(false)} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}><Text style={styles.backIcon}>‹</Text><Text style={styles.backText}>Configurações</Text></Pressable>
         <Text style={styles.sectionTitle}>Alterar senha</Text>
         <Text style={styles.sectionLead}>Use uma senha forte e diferente de outras contas.</Text>
@@ -563,7 +599,7 @@ export default function HomeScreen() {
         <View style={styles.settingsCard}>
           <Pressable onPress={() => setScreen("profile")} style={({ pressed }) => [styles.settingsRow, pressed && styles.pressed]}><View style={styles.settingsRowCopy}><Text style={styles.settingsRowTitle}>Editar perfil</Text><Text style={styles.settingsRowHint}>Nome, cidade, profissão e biografia</Text></View><Text style={styles.settingsChevron}>›</Text></Pressable>
           <Pressable onPress={() => { setMessage(""); setChangePasswordOpen(true); }} style={({ pressed }) => [styles.settingsRow, pressed && styles.pressed]}><View style={styles.settingsRowCopy}><Text style={styles.settingsRowTitle}>Alterar senha</Text><Text style={styles.settingsRowHint}>Mantenha sua conta protegida</Text></View><Text style={styles.settingsChevron}>›</Text></Pressable>
-          <Pressable onPress={() => showPlannedFeature("Excluir conta")} style={({ pressed }) => [styles.settingsRow, styles.dangerRow, pressed && styles.pressed]}><View style={styles.settingsRowCopy}><Text style={styles.dangerText}>Excluir conta</Text><Text style={styles.settingsRowHint}>Esta ação será irreversível</Text></View><Text style={styles.settingsChevron}>›</Text></Pressable>
+          <Pressable onPress={() => { setMessage(""); setDeletePassword(""); setDeleteConfirmation(""); setDeleteAccountOpen(true); }} style={({ pressed }) => [styles.settingsRow, styles.dangerRow, pressed && styles.pressed]}><View style={styles.settingsRowCopy}><Text style={styles.dangerText}>Excluir conta</Text><Text style={styles.settingsRowHint}>Esta ação será irreversível</Text></View><Text style={styles.settingsChevron}>›</Text></Pressable>
         </View>
         <Text style={styles.settingsSectionLabel}>PRIVACIDADE</Text>
         <View style={styles.settingsCard}>
@@ -769,6 +805,10 @@ const styles = StyleSheet.create({
   passwordSecurityTitle: { color: "#102A43", fontSize: 18, fontWeight: "800", marginBottom: 6 },
   passwordSecurityCopy: { color: "#5B6B73", fontSize: 13, lineHeight: 20, marginBottom: 12 },
   passwordError: { color: "#B5453B", fontSize: 12, marginTop: -4, marginBottom: 8 },
+  dangerPanel: { marginTop: 22, padding: 20, backgroundColor: "#FFF8F5", borderRadius: 16, borderWidth: 1, borderColor: "#E9B5A8", shadowColor: "#7C2D24", shadowOpacity: 0.05, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2 },
+  dangerPanelTitle: { color: "#9E3F35", fontSize: 19, fontWeight: "800", marginBottom: 8 },
+  dangerPanelCopy: { color: "#5B6B73", fontSize: 14, lineHeight: 22, marginBottom: 16 },
+  dangerButton: { minHeight: 54, borderRadius: 12, backgroundColor: "#9E3F35", alignItems: "center", justifyContent: "center", marginTop: 4 },
   profileIdentity: { alignItems: "center", marginBottom: 2 },
   largeAvatar: { width: 76, height: 76, borderRadius: 38, alignItems: "center", justifyContent: "center", backgroundColor: "#D7E8F4" },
   largeAvatarText: { color: "#17324D", fontSize: 20, fontWeight: "700" },

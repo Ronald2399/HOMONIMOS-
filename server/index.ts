@@ -87,6 +87,7 @@ const blockSchema = z.object({ userId: z.number().int().positive() }).strict();
 const profileSchema = z.object({ name: z.string().trim().min(2).max(80), city: z.string().trim().max(90), profession: z.string().trim().max(90), bio: z.string().trim().max(240) }).strict();
 const preferencesSchema = z.object({ notifyCommunities: z.boolean(), notifyReplies: z.boolean() }).strict();
 const passwordChangeSchema = z.object({ currentPassword: z.string().min(1).max(128), newPassword: z.string().min(8).max(128) }).strict();
+const accountDeletionSchema = z.object({ password: z.string().min(1).max(128), confirmation: z.literal("EXCLUIR") }).strict();
 
 app.get("/api/health", (_req, res) => res.json({ ok: true, service: "homonimos-api", database: databaseKind }));
 
@@ -151,6 +152,16 @@ app.patch("/api/auth/password", requireAuth, async (req: AuthRequest, res) => {
   if (parsed.data.currentPassword === parsed.data.newPassword) return res.status(400).json({ error: "SAME_PASSWORD", message: "Escolha uma senha diferente da atual." });
   await execute("UPDATE users SET password_hash = ? WHERE id = ?", [hashPassword(parsed.data.newPassword), req.user!.id]);
   return res.json({ changed: true, message: "Senha alterada com sucesso." });
+});
+
+app.delete("/api/auth/me", requireAuth, async (req: AuthRequest, res) => {
+  const parsed = accountDeletionSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "CONFIRMATION_REQUIRED", message: "Digite EXCLUIR para confirmar a remoção da conta." });
+  const account = await getUserByEmail(req.user!.email);
+  if (!account || !verifyPassword(parsed.data.password, account.password_hash)) return res.status(401).json({ error: "INVALID_PASSWORD", message: "A senha está incorreta." });
+  await execute("DELETE FROM users WHERE id = ?", [req.user!.id]);
+  clearSessionCookie(res);
+  return res.json({ deleted: true, message: "Conta excluída com sucesso." });
 });
 
 app.get("/api/search", async (req, res) => {

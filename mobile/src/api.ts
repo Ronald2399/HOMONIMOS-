@@ -91,6 +91,12 @@ export class HomonimosApi {
     return this.request<{ changed: boolean; message: string }>("/api/auth/password", { method: "PATCH", body: JSON.stringify({ currentPassword, newPassword }) });
   }
 
+  async deleteAccount(password: string, confirmation: string) {
+    const result = await this.request<{ deleted: boolean; message: string }>("/api/auth/me", { method: "DELETE", body: JSON.stringify({ password, confirmation }) });
+    this.sessionToken = null;
+    return result;
+  }
+
   async logout() {
     await this.request<void>("/api/auth/logout", { method: "POST" });
     this.sessionToken = null;
