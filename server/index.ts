@@ -12,18 +12,26 @@ const port = Number(process.env.PORT || 3001);
 const isProduction = process.env.NODE_ENV === "production";
 const sessionCookie = "hm_session";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const allowedOrigins = new Set((process.env.CORS_ORIGIN || (isProduction ? "https://homonimo-prod.onrender.com" : "http://localhost:3000")).split(",").map((origin) => origin.trim()).filter(Boolean));
+const authAttempts = new Map<string, { count: number; resetAt: number }>();
 
 app.use(express.json({ limit: "64kb" }));
 app.use(cookieParser());
 app.use((req, res, next) => {
-  const origin = process.env.CORS_ORIGIN || "*";
-  res.setHeader("Access-Control-Allow-Origin", origin);
+  const origin = req.header("origin");
+  if (origin && allowedOrigins.has(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.setHeader("Vary", "Origin");
+  }
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS");
   if (req.method === "OPTIONS") return res.status(204).end();
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  if (isProduction) res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
   next();
 });
 
@@ -78,6 +86,22 @@ async function requireAuth(req: AuthRequest, res: Response, next: NextFunction) 
   next();
 }
 
+function allowAuthAttempt(req: Request, res: Response) {
+  const key = `${req.ip || "unknown"}:${req.path}`;
+  const now = Date.now();
+  const current = authAttempts.get(key);
+  if (!current || current.resetAt <= now) {
+    authAttempts.set(key, { count: 1, resetAt: now + 15 * 60 * 1000 });
+    return true;
+  }
+  if (current.count >= 10) {
+    res.status(429).json({ error: "TOO_MANY_ATTEMPTS", message: "Muitas tentativas. Aguarde alguns minutos e tente novamente." });
+    return false;
+  }
+  current.count += 1;
+  return true;
+}
+
 const registerSchema = z.object({ name: z.string().trim().min(2).max(80), email: z.string().trim().email().max(160), password: z.string().min(8).max(128), city: z.string().trim().max(90).optional(), profession: z.string().trim().max(90).optional() }).strict();
 const loginSchema = z.object({ email: z.string().trim().email(), password: z.string().min(1).max(128) }).strict();
 const postSchema = z.object({ body: z.string().trim().min(1).max(1000) }).strict();
@@ -92,6 +116,7 @@ const accountDeletionSchema = z.object({ password: z.string().min(1).max(128), c
 app.get("/api/health", (_req, res) => res.json({ ok: true, service: "homonimos-api", database: databaseKind }));
 
 app.post("/api/auth/register", async (req, res) => {
+  if (!allowAuthAttempt(req, res)) return;
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "INVALID_INPUT", message: "Confira nome, e-mail e senha. Somente dados básicos são solicitados." });
   const data = parsed.data;
@@ -106,6 +131,7 @@ app.post("/api/auth/register", async (req, res) => {
 });
 
 app.post("/api/auth/login", async (req, res) => {
+  if (!allowAuthAttempt(req, res)) return;
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "INVALID_INPUT", message: "Informe um e-mail válido e sua senha." });
   const user = await getUserByEmail(parsed.data.email.toLowerCase());

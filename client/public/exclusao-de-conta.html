@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Excluir conta — Homônimos</title>
+  <style>
+    :root { font-family: Arial, sans-serif; color: #17324d; }
+    body { margin: 0; background: #f7f5f0; line-height: 1.55; }
+    main { max-width: 620px; margin: 0 auto; padding: 42px 20px 64px; }
+    section { background: #fffdf9; border: 1px solid #e5e7e2; border-radius: 18px; padding: 26px; box-shadow: 0 8px 28px rgba(16,42,67,.06); }
+    h1 { margin-top: 0; }
+    label { display: block; margin-top: 16px; font-weight: 700; }
+    input { box-sizing: border-box; width: 100%; margin-top: 7px; padding: 14px; border: 1px solid #cfd8d5; border-radius: 10px; font-size: 16px; }
+    button { width: 100%; margin-top: 22px; padding: 15px; border: 0; border-radius: 10px; background: #9e3f35; color: white; font-size: 16px; font-weight: 700; }
+    button:disabled { opacity: .55; }
+    .warning { padding: 14px; background: #fff1ed; border: 1px solid #e9b5a8; border-radius: 10px; }
+    #status { margin-top: 18px; font-weight: 700; }
+    .muted { color: #5b6b73; }
+  </style>
+</head>
+<body>
+<main><section>
+  <h1>Excluir conta do Homônimos</h1>
+  <p>Use este formulário para solicitar a exclusão da sua conta e dos dados associados. A ação é permanente.</p>
+  <p class="warning"><strong>Atenção:</strong> sua conta, publicações, comentários, participações, bloqueios e sessões serão removidos. Não envie sua senha por e-mail ou mensagem.</p>
+  <form id="delete-form">
+    <label for="email">E-mail da conta</label>
+    <input id="email" name="email" type="email" autocomplete="email" required>
+    <label for="password">Senha atual</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required>
+    <label for="confirmation">Digite EXCLUIR para confirmar</label>
+    <input id="confirmation" name="confirmation" autocomplete="off" required pattern="EXCLUIR">
+    <button id="submit" type="submit">Excluir conta permanentemente</button>
+  </form>
+  <p id="status" role="status"></p>
+  <p class="muted">Se preferir, faça a exclusão dentro do aplicativo em Perfil → Configurações e privacidade → Excluir conta.</p>
+</section></main>
+<script>
+  const form = document.getElementById('delete-form');
+  const status = document.getElementById('status');
+  const submit = document.getElementById('submit');
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const confirmation = document.getElementById('confirmation').value.trim().toUpperCase();
+    if (confirmation !== 'EXCLUIR') { status.textContent = 'Digite EXCLUIR exatamente para confirmar.'; return; }
+    submit.disabled = true;
+    status.textContent = 'Verificando…';
+    try {
+      const login = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ email, password }) });
+      const loginPayload = await login.json().catch(() => ({}));
+      if (!login.ok) throw new Error(loginPayload.message || 'E-mail ou senha inválidos.');
+      const response = await fetch('/api/auth/me', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ password, confirmation: 'EXCLUIR' }) });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.message || 'Não foi possível excluir a conta.');
+      form.reset();
+      status.textContent = 'Conta excluída com sucesso.';
+    } catch (error) {
+      status.textContent = error instanceof Error ? error.message : 'Não foi possível concluir a solicitação.';
+    } finally { submit.disabled = false; }
+  });
+</script>
+</body>
+</html>
